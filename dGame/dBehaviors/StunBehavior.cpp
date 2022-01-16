@@ -1,4 +1,10 @@
-﻿#include "StunBehavior.h"
+﻿/**
+ * This is currently not fully implemented, however introducing further changes to this to properly 
+ * implement will likely be a detriment to server performance and cause more bugs than it solves.
+ * 
+ */
+
+#include "StunBehavior.h"
 
 #include "BaseCombatAIComponent.h"
 #include "BehaviorBranchContext.h"
