@@ -263,6 +263,7 @@
 #include "ImaginationBackpackHealServer.h"
 #include "LegoDieRoll.h"
 #include "BuccaneerValiantShip.h"
+#include "ShardArmor.h"
 
 // Survival scripts
 #include "AgSurvivalStromling.h"
@@ -780,6 +781,8 @@ CppScripts::Script* CppScripts::GetScript(Entity* parent, const std::string& scr
 		script = new LegoDieRoll();
   	else if (scriptName == "scripts\\EquipmentScripts\\BuccaneerValiantShip.lua")
     	script = new BuccaneerValiantShip();
+	else if (scriptName == "scripts\\equipmenttriggers\\shardarmor.lua")
+		script = new ShardArmor();
 
 	//Ignore these scripts:
 	else if (scriptName == "scripts\\02_server\\Enemy\\General\\L_SUSPEND_LUA_AI.lua")
