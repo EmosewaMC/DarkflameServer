@@ -106,7 +106,7 @@ Entity* EntityManager::CreateEntity(EntityInfo info, User* user, Entity* parentE
 	
 	Entity* entity;
 
-	// Check if the entitty if a player, in case use the extended player entity class
+	// Check if the entity if a player, in case use the extended player entity class
 	if (user != nullptr) {
 		entity = new Player(id, info, user, parentEntity);
 	}
