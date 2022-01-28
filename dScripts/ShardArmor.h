@@ -12,12 +12,12 @@ public:
      * @param self The Entity that was hit.
      * @param attacker The Entity that attacked self.
      */
-    void OnHit(Entity* self, Entity* attacker);
+    void OnHit(Entity* self, Entity* attacker) override;
 private:
     /**
      * The LOT of the Shard Armor.
      */
-    LOT ShardArmorLOT = 13354;
+    LOT ShardArmorLOT = 13617;
     /**
      * The LOT of the Imaginite Pack.
      */

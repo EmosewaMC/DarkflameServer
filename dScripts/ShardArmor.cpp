@@ -5,7 +5,7 @@
 #include "dLogger.h"
 
 void ShardArmor::OnHit(Entity* self, Entity* attacker) {
-    Game::logger->Log("ShardArmor", "Preciously equipped = %i with number of hits = %i", previouslyEquippedArmor, numTimesHit);
+    Game::logger->Log("ShardArmor", "Previously equipped = %i with number of hits = %i", previouslyEquippedArmor, numTimesHit);
     auto inventoryComponent = self->GetComponent<InventoryComponent>();
     if (inventoryComponent == nullptr) return;
 
