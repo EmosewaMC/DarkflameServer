@@ -304,28 +304,16 @@ void SlashCommandHandler::HandleChatCommand(const std::u16string& command, Entit
 	if ((chatCommand == "leave-zone")) {
 		const auto currentZone = dZoneManager::Instance()->GetZone()->GetZoneID().GetMapID();
 
-		auto newZone = 1100;
-
-		switch (currentZone)
-		{
-		case 1101:
-			newZone = 1100;
-			break;
-		case 1204:
-			newZone = 1200;
-			break;
-		default:
-			newZone = 1100;
-			break;
-		}
-
-		if (currentZone == newZone)
-		{
+		auto newZone = 0;
+		if (currentZone % 100 == 0) {
 			ChatPackets::SendSystemMessage(sysAddr, u"You are not in an instanced zone.");
-			
 			return;
+		} else {
+			newZone = (currentZone / 100) * 100;
 		}
-		
+		// If new zone would be inaccessible, then default to Avant Gardens.
+		if (!CheckIfAccessibleZone(newZone)) newZone = 1100;
+
 		ChatPackets::SendSystemMessage(sysAddr, u"Leaving zone...");
 
 		const auto objid = entity->GetObjectID();
@@ -671,6 +659,21 @@ void SlashCommandHandler::HandleChatCommand(const std::u16string& command, Entit
         entity->GetCharacter()->SetPlayerFlag(flagId, true);
 	}
 
+	if (chatCommand == "setflag" && entity->GetGMLevel() >= GAME_MASTER_LEVEL_DEVELOPER && args.size() == 2)
+	{
+		uint32_t flagId;
+		std::string onOffFlag = args[0];
+		if (!GeneralUtils::TryParse(args[1], flagId))
+		{
+			ChatPackets::SendSystemMessage(sysAddr, u"Invalid flag id.");
+			return;
+		}
+		if (onOffFlag != "off" && onOffFlag != "on") {
+			ChatPackets::SendSystemMessage(sysAddr, u"Invalid flag type.");
+			return;
+		}
+        entity->GetCharacter()->SetPlayerFlag(flagId, onOffFlag == "on");
+	}
 	if (chatCommand == "clearflag" && entity->GetGMLevel() >= GAME_MASTER_LEVEL_DEVELOPER && args.size() == 1)
 	{
 		uint32_t flagId;
@@ -1289,8 +1292,8 @@ void SlashCommandHandler::HandleChatCommand(const std::u16string& command, Entit
 
 		CharacterComponent* character = entity->GetComponent<CharacterComponent>();
 		if (character) character->SetUScore(character->GetUScore() + uscore);
-
-		GameMessages::SendModifyLEGOScore(entity, entity->GetSystemAddress(), uscore, LOOTTYPE_NONE);
+		// LOOT_SOURCE_MODERATION should work but it doesn't.  Relog to see uscore changes 
+		GameMessages::SendModifyLEGOScore(entity, entity->GetSystemAddress(), uscore, LOOT_SOURCE_MODERATION);
 	}
 
 	if (chatCommand == "pos" && entity->GetGMLevel() >= GAME_MASTER_LEVEL_DEVELOPER) {
@@ -1928,53 +1931,54 @@ void SlashCommandHandler::HandleChatCommand(const std::u16string& command, Entit
 }
 
 bool SlashCommandHandler::CheckIfAccessibleZone(const unsigned int zoneID) {
-    switch (zoneID) {
-	case 98:
-        case 1000:
-        case 1001:
-            
-        case 1100:
-        case 1101:
-	case 1150:
-	case 1151:
-	case 1152:
-            
-        case 1200:
-        case 1201:
+	switch (zoneID) {
+		case 98:
+		case 1000:
+		case 1001:
 
-	case 1250:
-	case 1251:
-	case 1260:
-            
-        case 1300:
-    	case 1350:
-    	case 1351:
-		    
-        case 1400:
-	case 1401:
-	case 1450:
-	case 1451:
-            
-        case 1600:
-        case 1601:
-        case 1602:
-        case 1603:
-        case 1604:
-            
-        case 1800:
-        case 1900:
-        case 2000:
+		case 1100:
+		case 1101:
+		case 1150:
+		case 1151:
+		case 1152:
 
-	case 58004:
-	case 58005:
-	case 58006:
-            return true;
-        
-        default:
-            return false;
-    }
-    
-    return false;
+		case 1200:
+		case 1201:
+
+		case 1250:
+		case 1251:
+		case 1260:
+
+		case 1300:
+		case 1350:
+		case 1351:
+
+		case 1400:
+		case 1401:
+		case 1450:
+		case 1451:
+
+		case 1600:
+		case 1601:
+		case 1602:
+		case 1603:
+		case 1604:
+
+		case 1700:
+		case 1800:
+		case 1900:
+		case 2000:
+
+		case 58004:
+		case 58005:
+		case 58006:
+			return true;
+
+		default:
+			return false;
+	}
+
+	return false;
 }
 
 void SlashCommandHandler::SendAnnouncement(const std::string& title, const std::string& message) {
