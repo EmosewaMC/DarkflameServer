@@ -24,6 +24,7 @@
 #include "dZoneManager.h"
 #include "PropertyManagementComponent.h"
 #include "DestroyableComponent.h"
+#include "UserManager.h"
 
 InventoryComponent::InventoryComponent(Entity* parent, tinyxml2::XMLDocument* document) : Component(parent)
 {
@@ -910,6 +911,14 @@ void InventoryComponent::EquipItem(Item* item, const bool skipChecks)
 
 		const auto type = static_cast<eItemType>(item->GetInfo().itemType);
 		
+		if (item->GetLot() == 15975 || item->GetLot() == 13617) {
+			EntityInfo info {};
+			info.lot = item->GetLot();
+			auto shardArmor = EntityManager::Instance()->CreateEntity(info, nullptr, m_Parent);
+			Game::logger->Log("InventoryComponent", "Has Script Component size %i shard armor component size %i", m_Parent->GetScriptComponents().size(), shardArmor->GetScriptComponents().size());
+
+		}
+
 		if (item->GetLot() == 8092 && m_Parent->GetGMLevel() >= GAME_MASTER_LEVEL_OPERATOR && hasCarEquipped == false)
 		{	
 			auto startPosition = m_Parent->GetPosition();

@@ -790,7 +790,7 @@ CppScripts::Script* CppScripts::GetScript(Entity* parent, const std::string& scr
 		script = new LegoDieRoll();
   	else if (scriptName == "scripts\\EquipmentScripts\\BuccaneerValiantShip.lua")
     	script = new BuccaneerValiantShip();
-	else if (scriptName == "scripts\\equipmenttriggers\\shardarmor.lua")
+	else if (scriptName == "scripts\\equipmenttriggers\\shardarmor.lua" || scriptName == "scripts\\equipmenttriggers\\SHARDARMOR.lua" || scriptName == "scripts\\equipmenttriggers\\gempack.lua" || scriptName == "scripts\\equipmenttriggers\\GEMPACK.lua" || scriptName == "scripts\\equipmenttriggers\\COILBACKPACK.lua" || scriptName == "scripts\\equipmenttriggers\\coilbackpack.lua")
 		script = new ShardArmor();
 
 	//Ignore these scripts:
