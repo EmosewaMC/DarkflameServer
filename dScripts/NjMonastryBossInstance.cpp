@@ -310,7 +310,7 @@ void NjMonastryBossInstance::HandleLowerFrakjawHit(Entity *self, Entity *lowerFr
         return;
 
     // Progress the fight to the last wave if frakjaw has less than 50% of his health left
-    if (destroyableComponent->GetHealth() <= (uint32_t) destroyableComponent->GetMaxHealth() / 2 && !self->GetVar<bool>(OnLastWaveVarbiale)) {
+    if (static_cast<uint32_t>(destroyableComponent->GetHealth()) <= static_cast<uint32_t>(destroyableComponent->GetMaxHealth()) / 2 && !self->GetVar<bool>(OnLastWaveVarbiale)) {
         self->SetVar<bool>(OnLastWaveVarbiale, true);
 
         // Stun frakjaw during the cinematic
@@ -445,7 +445,7 @@ void NjMonastryBossInstance::SpawnOnNetwork(Entity* self, const LOT& toSpawn, co
 
     // Spawn the lot N times
     spawner->SetSpawnLot(toSpawn);
-    for (auto i = 0; i < numberToSpawn; i++)
+    for (uint32_t i = 0; i < numberToSpawn; i++)
         spawner->Spawn({ spawner->m_Info.nodes.at(i % spawner->m_Info.nodes.size()) }, true);
 }
 

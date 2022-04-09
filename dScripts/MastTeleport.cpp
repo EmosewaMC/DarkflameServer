@@ -46,11 +46,11 @@ void MastTeleport::OnTimerDone(Entity* self, std::string timerName)
         // Hacky fix for odd rotations
         if (self->GetVar<std::u16string>(u"MastName") != u"Jail")
         {
-            GameMessages::SendOrientToAngle(playerId, true, (M_PI / 180) * 140.0f, player->GetSystemAddress());
+            GameMessages::SendOrientToAngle(playerId, true, static_cast<float>((M_PI / 180) * 140.0f), player->GetSystemAddress());
         }
         else
         {
-            GameMessages::SendOrientToAngle(playerId, true, (M_PI / 180) * 100.0f, player->GetSystemAddress());
+            GameMessages::SendOrientToAngle(playerId, true, static_cast<float>((M_PI / 180) * 100.0f), player->GetSystemAddress());
         }
         
         const auto cinematic = GeneralUtils::UTF16ToWTF8(self->GetVar<std::u16string>(u"Cinematic"));

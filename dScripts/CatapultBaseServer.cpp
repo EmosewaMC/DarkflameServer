@@ -57,7 +57,7 @@ void CatapultBaseServer::OnTimerDone(Entity* self, std::string timerName)
 		// bounce all players
 		bouncer->NotifyObject(bouncer, "bounceAllInProximity"); // Likely to trigger server side bounce, bodging this
 		// add a delay to play the animation
-		self->AddTimer("launchAnim", .3);
+		self->AddTimer("launchAnim", 0.3f);
 	}
 	else if (timerName == "resetArm")
 	{
