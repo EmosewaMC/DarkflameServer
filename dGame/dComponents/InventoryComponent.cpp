@@ -84,6 +84,7 @@ Inventory* InventoryComponent::GetInventory(const eInventoryType type)
 	case eInventoryType::ITEMS:
 		size = 20u;
 		break;
+	case eInventoryType::VAULT_MODELS:
 	case eInventoryType::VAULT_ITEMS:
 		size = 40u;
 		break;
@@ -1043,7 +1044,7 @@ void InventoryComponent::EquipItem(Item* item, const bool skipChecks)
 	
 	UpdateSlot(item->GetInfo().equipLocation, { item->GetId(), item->GetLot(), item->GetCount(), item->GetSlot() });
 
-	ApplyBuff(item->GetLot());
+	ApplyBuff(item);
 	
 	AddItemSkills(item->GetLot());
 
@@ -1071,7 +1072,7 @@ void InventoryComponent::UnEquipItem(Item* item)
 		set->OnUnEquip(lot);
 	}
 
-	RemoveBuff(item->GetLot());
+	RemoveBuff(item);
 	
 	RemoveItemSkills(item->GetLot());
 
@@ -1089,9 +1090,9 @@ void InventoryComponent::UnEquipItem(Item* item)
 	}
 }
 
-void InventoryComponent::ApplyBuff(const LOT lot) const
+void InventoryComponent::ApplyBuff(Item* item) const
 {
-	const auto buffs = FindBuffs(lot, true);
+	const auto buffs = FindBuffs(item, true);
 
 	for (const auto buff : buffs)
 	{	
@@ -1099,9 +1100,9 @@ void InventoryComponent::ApplyBuff(const LOT lot) const
 	}
 }
 
-void InventoryComponent::RemoveBuff(const LOT lot) const
+void InventoryComponent::RemoveBuff(Item* item) const
 {
-	const auto buffs = FindBuffs(lot, false);
+	const auto buffs = FindBuffs(item, false);
 
 	for (const auto buff : buffs)
 	{
@@ -1229,18 +1230,18 @@ void InventoryComponent::AddItemSkills(const LOT lot)
 	
 	const auto index = m_Skills.find(slot);
 
-	if (index != m_Skills.end())
-	{
-		const auto old = index->second;
-		
-		GameMessages::SendRemoveSkill(m_Parent, old);
-	}
-
 	const auto skill = FindSkill(lot);
 
 	if (skill == 0)
 	{
 		return;
+	}
+
+	if (index != m_Skills.end())
+	{
+		const auto old = index->second;
+		
+		GameMessages::SendRemoveSkill(m_Parent, old);
 	}
 	
 	GameMessages::SendAddSkill(m_Parent, skill, static_cast<int>(slot));
@@ -1418,17 +1419,17 @@ uint32_t InventoryComponent::FindSkill(const LOT lot)
 	return 0;
 }
 
-std::vector<uint32_t> InventoryComponent::FindBuffs(const LOT lot, bool castOnEquip) const
+std::vector<uint32_t> InventoryComponent::FindBuffs(Item* item, bool castOnEquip) const
 {
+	std::vector<uint32_t> buffs;
+	if (item == nullptr) return buffs;
 	auto* table = CDClientManager::Instance()->GetTable<CDObjectSkillsTable>("ObjectSkills");
 	auto* behaviors = CDClientManager::Instance()->GetTable<CDSkillBehaviorTable>("SkillBehavior");
 
 	const auto results = table->Query([=](const CDObjectSkills& entry)
 	{
-		return entry.objectTemplate == static_cast<unsigned int>(lot);
+		return entry.objectTemplate == static_cast<unsigned int>(item->GetLot());
 	});
-
-	std::vector<uint32_t> buffs;
 
 	auto* missions = static_cast<MissionComponent*>(m_Parent->GetComponent(COMPONENT_TYPE_MISSION));
 
@@ -1449,8 +1450,8 @@ std::vector<uint32_t> InventoryComponent::FindBuffs(const LOT lot, bool castOnEq
 			{
 				missions->Progress(MissionTaskType::MISSION_TASK_TYPE_SKILL, result.skillID);
 			}
-			
-			buffs.push_back(static_cast<uint32_t>(entry.behaviorID));
+			// If item is not a proxy, add its buff to the added buffs.
+			if (item->GetParent() == LWOOBJID_EMPTY) buffs.push_back(static_cast<uint32_t>(entry.behaviorID));
 		}
 	}
 
