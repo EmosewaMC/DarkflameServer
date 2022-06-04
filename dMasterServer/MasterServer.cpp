@@ -219,6 +219,8 @@ int main(int argc, char** argv) {
 		StartChatServer();
 
 		Game::im->GetInstance(0, false, 0)->SetIsReady(true);
+		Game::im->GetInstance(1000, false, 0)->SetIsReady(true);
+		Game::im->GetInstance(1100, false, 0)->SetIsReady(true);
 		Game::im->GetInstance(1250, false, 28)->SetIsReady(true);
 
 		StartAuthServer();
@@ -674,6 +676,71 @@ void HandlePacket(Packet* packet) {
 		case MSG_MASTER_SHUTDOWN_UNIVERSE: {
 			Game::logger->Log("MasterServer","Received shutdown universe command, shutting down in 10 minutes.\n");
 			shouldShutdown = true;
+			break;
+		}
+
+		case MSG_MASTER_SHUTDOWN_INSTANCE: {
+			RakNet::BitStream inStream(packet->data, packet->length, false);
+			uint64_t header = inStream.Read(header);
+
+			uint32_t zoneID;
+			uint16_t instanceID;
+
+			inStream.Read(zoneID);
+			inStream.Read(instanceID);
+
+			Game::logger->Log("MasterServer","Attempting to shutdown an zone %i instance %i via slash command\n", zoneID, instanceID);
+
+			auto* instance = Game::im->FindInstance(zoneID, instanceID);
+
+			if (instance) {
+				Game::logger->Log("MasterServer","Shutting down found instance\n");
+				instance->Shutdown();
+			} else {
+				Game::logger->Log("MasterServer","Failed to find instance!\n");
+			}
+			break;
+		}
+
+		case MSG_MASTER_GET_INSTANCES: {
+			RakNet::BitStream inStream(packet->data, packet->length, false);
+			uint64_t header = inStream.Read(header);
+
+			uint64_t objectID;
+			uint16_t zoneID = LWOMAPID_INVALID;
+			uint16_t respondingZoneID;
+			uint16_t respondingInstanceID;
+
+			inStream.Read(objectID);
+			if (inStream.ReadBit()) inStream.Read(zoneID);
+			inStream.Read(respondingZoneID);
+			inStream.Read(respondingInstanceID);
+
+			CBITSTREAM
+
+			PacketUtils::WriteHeader(bitStream, MASTER, MSG_MASTER_RESPOND_INSTANCES);
+
+			bitStream.Write(objectID);
+
+			auto respondingSysAddr = Game::im->FindInstance(respondingZoneID, respondingInstanceID)->GetSysAddr();
+
+			std::vector<Instance*> instances;
+			if (zoneID == LWOMAPID_INVALID) {
+				instances = Game::im->GetInstances();
+			} else {
+				instances = Game::im->FindInstancesByMapID(zoneID);
+			}
+
+			bitStream.Write<uint32_t>(instances.size());
+
+			for (uint32_t i = 0; i < instances.size(); i++) {
+				bitStream.Write(instances[i]->GetZoneID().GetMapID());
+				bitStream.Write(instances[i]->GetZoneID().GetCloneID());
+				bitStream.Write(instances[i]->GetZoneID().GetInstanceID());
+			}
+
+			Game::server->Send(&bitStream, respondingSysAddr, false);
+
 			break;
 		}
 
