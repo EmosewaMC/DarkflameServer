@@ -9,11 +9,11 @@
 #include "EntityManager.h"
 
 
-void SwitchMultipleBehavior::Handle(BehaviorContext* context, RakNet::BitStream* bit_stream, BehaviorBranchContext branch)
+void SwitchMultipleBehavior::Handle(BehaviorContext* context, RakNet::BitStream* bitStream, BehaviorBranchContext branch)
 {
 	float value;
 
-	bit_stream->Read(value);
+	bitStream->Read(value);
 	
 	uint32_t trigger = 0;
 
@@ -31,10 +31,10 @@ void SwitchMultipleBehavior::Handle(BehaviorContext* context, RakNet::BitStream*
 
 	auto* behavior = this->m_behaviors.at(trigger).second;
 
-	behavior->Handle(context, bit_stream, branch);
+	behavior->Handle(context, bitStream, branch);
 }
 
-void SwitchMultipleBehavior::Calculate(BehaviorContext* context, RakNet::BitStream* bit_stream, BehaviorBranchContext branch)
+void SwitchMultipleBehavior::Calculate(BehaviorContext* context, RakNet::BitStream* bitStream, BehaviorBranchContext branch)
 {
 	// TODO
 }

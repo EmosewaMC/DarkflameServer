@@ -6,7 +6,7 @@
 #include "dLogger.h"
 #include "Game.h"
 
-void RepairBehavior::Handle(BehaviorContext* context, RakNet::BitStream* bit_stream, const BehaviorBranchContext branch)
+void RepairBehavior::Handle(BehaviorContext* context, RakNet::BitStream* bitStream, const BehaviorBranchContext branch)
 {
 	auto* entity = EntityManager::Instance()->GetEntity(branch.target);
 
@@ -29,9 +29,9 @@ void RepairBehavior::Handle(BehaviorContext* context, RakNet::BitStream* bit_str
 	destroyable->Repair(this->m_armor);
 }
 
-void RepairBehavior::Calculate(BehaviorContext* context, RakNet::BitStream* bit_stream, const BehaviorBranchContext branch)
+void RepairBehavior::Calculate(BehaviorContext* context, RakNet::BitStream* bitStream, const BehaviorBranchContext branch)
 {
-	Handle(context, bit_stream, branch);
+	Handle(context, bitStream, branch);
 }
 
 void RepairBehavior::Load()

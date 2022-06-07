@@ -3,13 +3,13 @@
 #include "BehaviorContext.h"
 
 
-void NpcCombatSkillBehavior::Calculate(BehaviorContext* context, RakNet::BitStream* bit_stream, BehaviorBranchContext branch)
+void NpcCombatSkillBehavior::Calculate(BehaviorContext* context, RakNet::BitStream* bitStream, BehaviorBranchContext branch)
 {
 	context->skillTime = this->m_npcSkillTime;
 	
 	for (auto* behavior : this->m_behaviors)
 	{
-		behavior->Calculate(context, bit_stream, branch);
+		behavior->Calculate(context, bitStream, branch);
 	}
 }
 

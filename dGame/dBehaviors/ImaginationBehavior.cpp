@@ -6,7 +6,7 @@
 #include "dLogger.h"
 
 
-void ImaginationBehavior::Handle(BehaviorContext* context, RakNet::BitStream* bit_stream, const BehaviorBranchContext branch)
+void ImaginationBehavior::Handle(BehaviorContext* context, RakNet::BitStream* bitStream, const BehaviorBranchContext branch)
 {
 	auto* entity = EntityManager::Instance()->GetEntity(branch.target);
 
@@ -26,9 +26,9 @@ void ImaginationBehavior::Handle(BehaviorContext* context, RakNet::BitStream* bi
 
 }
 
-void ImaginationBehavior::Calculate(BehaviorContext* context, RakNet::BitStream* bit_stream, const BehaviorBranchContext branch)
+void ImaginationBehavior::Calculate(BehaviorContext* context, RakNet::BitStream* bitStream, const BehaviorBranchContext branch)
 {
-	Handle(context, bit_stream, branch);
+	Handle(context, bitStream, branch);
 }
 
 void ImaginationBehavior::Load()

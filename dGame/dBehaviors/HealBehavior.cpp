@@ -6,7 +6,7 @@
 #include "DestroyableComponent.h"
 
 
-void HealBehavior::Handle(BehaviorContext* context, RakNet::BitStream* bit_stream, const BehaviorBranchContext branch)
+void HealBehavior::Handle(BehaviorContext* context, RakNet::BitStream* bitStream, const BehaviorBranchContext branch)
 {
 	auto* entity = EntityManager::Instance()->GetEntity(branch.target);
 
@@ -30,9 +30,9 @@ void HealBehavior::Handle(BehaviorContext* context, RakNet::BitStream* bit_strea
 }
 
 
-void HealBehavior::Calculate(BehaviorContext* context, RakNet::BitStream* bit_stream, const BehaviorBranchContext branch)
+void HealBehavior::Calculate(BehaviorContext* context, RakNet::BitStream* bitStream, const BehaviorBranchContext branch)
 {
-	Handle(context, bit_stream, branch);
+	Handle(context, bitStream, branch);
 }
 
 

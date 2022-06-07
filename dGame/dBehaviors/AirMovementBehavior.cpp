@@ -19,15 +19,15 @@ void AirMovementBehavior::Calculate(BehaviorContext* context, RakNet::BitStream*
 	bitStream->Write(handle);
 }
 
-void AirMovementBehavior::Sync(BehaviorContext* context, RakNet::BitStream* bit_stream, BehaviorBranchContext branch)
+void AirMovementBehavior::Sync(BehaviorContext* context, RakNet::BitStream* bitStream, BehaviorBranchContext branch)
 {
 	uint32_t behaviorId;
 
-	bit_stream->Read(behaviorId);
+	bitStream->Read(behaviorId);
 
 	LWOOBJID target;
 
-	bit_stream->Read(target);
+	bitStream->Read(target);
 
 	auto* behavior = CreateBehavior(behaviorId);
 
@@ -36,7 +36,7 @@ void AirMovementBehavior::Sync(BehaviorContext* context, RakNet::BitStream* bit_
 		branch.target = target;
 	}
 	
-	behavior->Handle(context, bit_stream, branch);
+	behavior->Handle(context, bitStream, branch);
 }
 
 void AirMovementBehavior::Load()

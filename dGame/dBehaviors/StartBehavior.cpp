@@ -1,18 +1,18 @@
 ﻿#include "StartBehavior.h"
 #include "BehaviorBranchContext.h"
 
-void StartBehavior::Handle(BehaviorContext* context, RakNet::BitStream* bit_stream, BehaviorBranchContext branch)
+void StartBehavior::Handle(BehaviorContext* context, RakNet::BitStream* bitStream, BehaviorBranchContext branch)
 {
 	branch.start = this->m_behaviorId;
 	
-	this->m_action->Handle(context, bit_stream, branch);
+	this->m_action->Handle(context, bitStream, branch);
 }
 
-void StartBehavior::Calculate(BehaviorContext* context, RakNet::BitStream* bit_stream, BehaviorBranchContext branch)
+void StartBehavior::Calculate(BehaviorContext* context, RakNet::BitStream* bitStream, BehaviorBranchContext branch)
 {
 	branch.start = this->m_behaviorId;
 
-	this->m_action->Calculate(context, bit_stream, branch);
+	this->m_action->Calculate(context, bitStream, branch);
 }
 
 void StartBehavior::Load()
