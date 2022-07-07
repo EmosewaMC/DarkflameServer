@@ -666,7 +666,7 @@ void DestroyableComponent::Damage(uint32_t damage, const LWOOBJID source, uint32
 	    cb(attacker);
 	}
 
-	if (health != 0)
+	if (GetHealth() != 0)
 	{
 		auto* combatComponent = m_Parent->GetComponent<BaseCombatAIComponent>();
 
