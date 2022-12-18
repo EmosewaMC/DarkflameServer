@@ -443,9 +443,7 @@ void RacingControlComponent::HandleMessageBoxResponse(Entity* player,
 	}
 }
 
-void RacingControlComponent::Serialize(RakNet::BitStream* outBitStream,
-	bool bIsInitialUpdate,
-	unsigned int& flags) {
+void RacingControlComponent::Serialize(RakNet::BitStream* outBitStream, bool bIsInitialUpdate, unsigned int& flags) {
 	// BEGIN Scripted Activity
 
 	outBitStream->Write1();
