@@ -118,7 +118,7 @@ void ScriptedActivityComponent::HandleMessageBoxResponse(Entity* player, const s
 }
 
 void ScriptedActivityComponent::PlayerJoin(Entity* player) {
-	if (m_ActivityInfo.ActivityID == 103 || PlayerIsInQueue(player) || !IsValidActivity(player)) {
+	if (m_ActivityInfo.ActivityID == 103 || PlayerIsInQueue(player)) {
 		return;
 	}
 
@@ -283,23 +283,6 @@ void ScriptedActivityComponent::RemoveLobby(Lobby* lobby) {
 bool ScriptedActivityComponent::HasLobby() const {
 	// If the player is not in the world he has to be, create a lobby for the transfer
 	return m_ActivityInfo.instanceMapID != UINT_MAX && m_ActivityInfo.instanceMapID != Game::server->GetZoneID();
-}
-
-bool ScriptedActivityComponent::IsValidActivity(Entity* player) {
-	// Makes it so that scripted activities with an unimplemented map cannot be joined
-	/*if (player->GetGMLevel() < GAME_MASTER_LEVEL_DEVELOPER && (m_ActivityInfo.instanceMapID == 1302 || m_ActivityInfo.instanceMapID == 1301)) {
-		if (m_Parent->GetLOT() == 4860) {
-			auto* missionComponent = player->GetComponent<MissionComponent>();
-			missionComponent->CompleteMission(229);
-		}
-
-		ChatPackets::SendSystemMessage(player->GetSystemAddress(), u"Sorry, this activity is not ready.");
-		static_cast<Player*>(player)->SendToZone(dZoneManager::Instance()->GetZone()->GetWorldID()); // Gets them out of this stuck state
-
-		return false;
-	}*/
-
-	return true;
 }
 
 bool ScriptedActivityComponent::PlayerIsInQueue(Entity* player) {

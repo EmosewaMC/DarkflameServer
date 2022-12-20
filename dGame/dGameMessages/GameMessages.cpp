@@ -1439,7 +1439,7 @@ void GameMessages::SendMatchUpdate(Entity* entity, const SystemAddress& sysAddr,
 	}
 	if (data.size() > 0) bitStream.Write(uint16_t(0));
 	bitStream.Write(type);
-
+	Game::logger->Log("GameMessages", "Sending match update with %i bits", bitStream.GetNumberOfBitsUsed());
 	SEND_PACKET;
 }
 
