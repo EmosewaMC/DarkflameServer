@@ -21,6 +21,7 @@ class Entity;
 class NiPoint3;
 enum class eUnequippableActiveType;
 enum eInventoryType : uint32_t;
+enum eMatchUpdate : uint32_t;
 class Item;
 
 namespace GameMessages {
@@ -120,8 +121,8 @@ namespace GameMessages {
 	void SendUseItemResult(Entity* entity, LOT templateID, bool useItemResult);
 	void SendMoveInventoryBatch(Entity* entity, uint32_t stackCount, int srcInv, int dstInv, const LWOOBJID& iObjID);
 
-	void SendMatchResponse(Entity* entity, const SystemAddress& sysAddr, int response);
-	void SendMatchUpdate(Entity* entity, const SystemAddress& sysAddr, std::string data, int type);
+	void SendMatchResponse(Entity* entity, const SystemAddress& sysAddr, eMatchUpdate response);
+	void SendMatchUpdate(Entity* entity, const SystemAddress& sysAddr, std::string data, eMatchUpdate type);
 
 	void HandleUnUseModel(RakNet::BitStream* inStream, Entity* entity, const SystemAddress& sysAddr);
 	void SendStartCelebrationEffect(Entity* entity, const SystemAddress& sysAddr, int celebrationID);

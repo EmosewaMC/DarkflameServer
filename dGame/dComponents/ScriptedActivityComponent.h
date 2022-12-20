@@ -3,14 +3,14 @@
  * Copyright 2018
  */
 
-#include "CDClientManager.h"
-
 #ifndef SCRIPTEDACTIVITYCOMPONENT_H
 #define SCRIPTEDACTIVITYCOMPONENT_H
 
 #include "BitStream.h"
-#include "Entity.h"
+
 #include "Component.h"
+#include "CDClientManager.h"
+#include "Entity.h"
 
  /**
   * Represents an instance of an activity, having participants and score
@@ -18,7 +18,6 @@
 class ActivityInstance {
 public:
 	ActivityInstance(Entity* parent, CDActivities activityInfo) { m_Parent = parent; m_ActivityInfo = activityInfo; };
-	//~ActivityInstance();
 
 	/**
 	 * Adds an entity to this activity
@@ -288,12 +287,6 @@ public:
 	void ClearInstances();
 
 	/**
-	 * Returns all the score for the players that are currently playing this activity
-	 * @return
-	 */
-	std::vector<ActivityPlayer*> GetActivityPlayers() { return m_ActivityPlayers; };
-
-	/**
 	 * Returns activity data for a specific entity (e.g. score and such).
 	 * @param playerID the entity to get data for
 	 * @return the activity data (score) for the passed player in this activity, if it exists
@@ -370,7 +363,6 @@ private:
 
 	/**
 	 * The activity id
-	 *
 	 */
 	int32_t m_ActivityID;
 };

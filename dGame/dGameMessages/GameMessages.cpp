@@ -1416,7 +1416,7 @@ void GameMessages::SendMoveInventoryBatch(Entity* entity, uint32_t stackCount, i
 	SEND_PACKET;
 }
 
-void GameMessages::SendMatchResponse(Entity* entity, const SystemAddress& sysAddr, int response) {
+void GameMessages::SendMatchResponse(Entity* entity, const SystemAddress& sysAddr, eMatchUpdate response) {
 	CBITSTREAM;
 	CMSGHEADER;
 
@@ -1427,7 +1427,7 @@ void GameMessages::SendMatchResponse(Entity* entity, const SystemAddress& sysAdd
 	SEND_PACKET;
 }
 
-void GameMessages::SendMatchUpdate(Entity* entity, const SystemAddress& sysAddr, std::string data, int type) {
+void GameMessages::SendMatchUpdate(Entity* entity, const SystemAddress& sysAddr, std::string data, eMatchUpdate type) {
 	CBITSTREAM;
 	CMSGHEADER;
 

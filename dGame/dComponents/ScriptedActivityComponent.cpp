@@ -135,7 +135,7 @@ void ScriptedActivityComponent::PlayerJoin(Entity* player) {
 
 void ScriptedActivityComponent::PlayerJoinLobby(Entity* player) {
 	if (!m_Parent->HasComponent(COMPONENT_TYPE_REBUILD))
-		GameMessages::SendMatchResponse(player, player->GetSystemAddress(), 0); // tell the client they joined a lobby
+		GameMessages::SendMatchResponse(player, player->GetSystemAddress(), eMatchUpdate::MATCH_UPDATE_PLAYER_JOINED); // tell the client they joined a lobby
 	LobbyPlayer* newLobbyPlayer = new LobbyPlayer();
 	newLobbyPlayer->entityID = player->GetObjectID();
 	Lobby* playerLobby = nullptr;
@@ -506,7 +506,7 @@ void ActivityInstance::StartZone() {
 			if (player == nullptr)
 				return;
 
-			Game::logger->Log("UserManager", "Transferring %s to Zone %i (Instance %i | Clone %i | Mythran Shift: %s) with IP %s and Port %i", player->GetCharacter()->GetName().c_str(), zoneID, zoneInstance, zoneClone, mythranShift == true ? "true" : "false", serverIP.c_str(), serverPort);
+			Game::logger->Log("ScriptedActivityComponent", "Transferring %s to Zone %i (Instance %i | Clone %i | Mythran Shift: %s) with IP %s and Port %i", player->GetCharacter()->GetName().c_str(), zoneID, zoneInstance, zoneClone, mythranShift == true ? "true" : "false", serverIP.c_str(), serverPort);
 			if (player->GetCharacter()) {
 				player->GetCharacter()->SetZoneID(zoneID);
 				player->GetCharacter()->SetZoneInstance(zoneInstance);

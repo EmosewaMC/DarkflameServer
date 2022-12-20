@@ -197,7 +197,7 @@ enum eObjectBits : int32_t {
 };
 
 //! An enum for MatchUpdate types
-enum eMatchUpdate : int {
+enum eMatchUpdate : uint32_t {
 	MATCH_UPDATE_PLAYER_JOINED = 0,
 	MATCH_UPDATE_PLAYER_LEFT = 1,
 	MATCH_UPDATE_TIME = 3,
