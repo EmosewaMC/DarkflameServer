@@ -1,5 +1,5 @@
 set(DCOMMONTEST_SOURCES
-	"AMFDeserializeTests.cpp"
+	"Amf3DeserializeTests.cpp"
 	"Amf3Tests.cpp"
 	"TestLDFFormat.cpp"
 	"TestNiPoint3.cpp"

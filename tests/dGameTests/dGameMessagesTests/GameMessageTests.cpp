@@ -1,6 +1,6 @@
 #include "Action.h"
 #include "Amf3.h"
-#include "AMFDeserialize.h"
+#include "Amf3Deserialize.h"
 #include "GameMessages.h"
 #include "GameDependencies.h"
 
@@ -39,7 +39,7 @@ protected:
 		return readFile;
 	}
 	AMFArrayValue* ReadArrayFromBitStream(RakNet::BitStream* inStream) {
-		AMFDeserialize des;
+		Amf3Deserialize des;
 		AMFValue* readArray = des.Read(inStream);
 		EXPECT_EQ(readArray->GetValueType(), eAmf::Array);
 		return static_cast<AMFArrayValue*>(readArray);

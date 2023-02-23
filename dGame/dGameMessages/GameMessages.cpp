@@ -76,10 +76,10 @@
 #include "PropertySelectQueryProperty.h"
 #include "TradingManager.h"
 #include "ControlBehaviors.h"
-#include "AMFDeserialize.h"
+#include "Amf3Deserialize.h"
 #include "eBlueprintSaveResponseType.h"
 #include "eAninmationFlags.h"
-#include "AMFFormat_BitStream.h"
+#include "Amf3_BitStream.h"
 
 void GameMessages::SendFireEventClientSide(const LWOOBJID& objectID, const SystemAddress& sysAddr, std::u16string args, const LWOOBJID& object, int64_t param1, int param2, const LWOOBJID& sender) {
 	CBITSTREAM;
@@ -2458,7 +2458,7 @@ void GameMessages::SendUnSmash(Entity* entity, LWOOBJID builderID, float duratio
 }
 
 void GameMessages::HandleControlBehaviors(RakNet::BitStream* inStream, Entity* entity, const SystemAddress& sysAddr) {
-	AMFDeserialize reader;
+	Amf3Deserialize reader;
 	std::unique_ptr<AMFValue> amfArguments(reader.Read(inStream));
 	if (amfArguments->GetValueType() != eAmf::Array) return;
 

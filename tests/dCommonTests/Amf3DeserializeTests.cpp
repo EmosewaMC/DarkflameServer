@@ -2,7 +2,7 @@
 #include <memory>
 #include <gtest/gtest.h>
 
-#include "AMFDeserialize.h"
+#include "Amf3Deserialize.h"
 #include "Amf3.h"
 
 #include "Game.h"
@@ -19,7 +19,7 @@ namespace Game {
  * Helper method that all tests use to get their respective AMF.
  */
 std::unique_ptr<AMFValue> ReadFromBitStream(RakNet::BitStream* bitStream) {
-	AMFDeserialize deserializer;
+	Amf3Deserialize deserializer;
 	std::unique_ptr<AMFValue> returnValue(deserializer.Read(bitStream));
 	return returnValue;
 }
@@ -27,7 +27,7 @@ std::unique_ptr<AMFValue> ReadFromBitStream(RakNet::BitStream* bitStream) {
 /**
  * @brief Test reading an AMFUndefined value from a BitStream.
  */
-TEST(dCommonTests, AMFDeserializeAMFUndefinedTest) {
+TEST(dCommonTests, Amf3DeserializeAMFUndefinedTest) {
 	CBITSTREAM
 	bitStream.Write<uint8_t>(0x00);
 	std::unique_ptr<AMFValue> res(ReadFromBitStream(&bitStream));
@@ -38,7 +38,7 @@ TEST(dCommonTests, AMFDeserializeAMFUndefinedTest) {
  * @brief Test reading an AMFNull value from a BitStream.
  *
  */
-TEST(dCommonTests, AMFDeserializeAMFNullTest) {
+TEST(dCommonTests, Amf3DeserializeAMFNullTest) {
 	CBITSTREAM
 	bitStream.Write<uint8_t>(0x01);
 	std::unique_ptr<AMFValue> res(ReadFromBitStream(&bitStream));
@@ -48,7 +48,7 @@ TEST(dCommonTests, AMFDeserializeAMFNullTest) {
 /**
  * @brief Test reading an AMFFalse value from a BitStream.
  */
-TEST(dCommonTests, AMFDeserializeAMFFalseTest) {
+TEST(dCommonTests, Amf3DeserializeAMFFalseTest) {
 	CBITSTREAM
 	bitStream.Write<uint8_t>(0x02);
 	std::unique_ptr<AMFValue> res(ReadFromBitStream(&bitStream));
@@ -58,7 +58,7 @@ TEST(dCommonTests, AMFDeserializeAMFFalseTest) {
 /**
  * @brief Test reading an AMFTrue value from a BitStream.
  */
-TEST(dCommonTests, AMFDeserializeAMFTrueTest) {
+TEST(dCommonTests, Amf3DeserializeAMFTrueTest) {
 	CBITSTREAM
 	bitStream.Write<uint8_t>(0x03);
 	std::unique_ptr<AMFValue> res(ReadFromBitStream(&bitStream));
@@ -68,7 +68,7 @@ TEST(dCommonTests, AMFDeserializeAMFTrueTest) {
 /**
  * @brief Test reading an AMFInteger value from a BitStream.
  */
-TEST(dCommonTests, AMFDeserializeAMFIntegerTest) {
+TEST(dCommonTests, Amf3DeserializeAMFIntegerTest) {
 	CBITSTREAM
 	{
 		bitStream.Write<uint8_t>(0x04);
@@ -119,7 +119,7 @@ TEST(dCommonTests, AMFDeserializeAMFIntegerTest) {
 /**
  * @brief Test reading an AMFDouble value from a BitStream.
  */
-TEST(dCommonTests, AMFDeserializeAMFDoubleTest) {
+TEST(dCommonTests, Amf3DeserializeAMFDoubleTest) {
 	CBITSTREAM
 	bitStream.Write<uint8_t>(0x05);
 	bitStream.Write<double>(25346.4f);
@@ -131,7 +131,7 @@ TEST(dCommonTests, AMFDeserializeAMFDoubleTest) {
 /**
  * @brief Test reading an AMFString value from a BitStream.
  */
-TEST(dCommonTests, AMFDeserializeAMFStringTest) {
+TEST(dCommonTests, Amf3DeserializeAMFStringTest) {
 	CBITSTREAM
 	bitStream.Write<uint8_t>(0x06);
 	bitStream.Write<uint8_t>(0x0F);
@@ -145,7 +145,7 @@ TEST(dCommonTests, AMFDeserializeAMFStringTest) {
 /**
  * @brief Test reading an AMFArray value from a BitStream.
  */
-TEST(dCommonTests, AMFDeserializeAMFArrayTest) {
+TEST(dCommonTests, Amf3DeserializeAMFArrayTest) {
 	CBITSTREAM
 	// Test empty AMFArray
 	bitStream.Write<uint8_t>(0x09);
@@ -185,8 +185,8 @@ TEST(dCommonTests, AMFDeserializeAMFArrayTest) {
  * we correctly throw an error and can actch it.
  *
  */
-#pragma message("-- The AMFDeserializeUnimplementedValuesTest causes a known memory leak of 880 bytes since it throws errors! --")
-TEST(dCommonTests, AMFDeserializeUnimplementedValuesTest) {
+#pragma message("-- The Amf3DeserializeUnimplementedValuesTest causes a known memory leak of 880 bytes since it throws errors! --")
+TEST(dCommonTests, Amf3DeserializeUnimplementedValuesTest) {
 	std::vector<eAmf> unimplementedValues = {
 		eAmf::XMLDoc,
 		eAmf::Date,
@@ -225,15 +225,14 @@ TEST(dCommonTests, AMFDeserializeUnimplementedValuesTest) {
 		} catch (eAmf unimplementedValueType) {
 			caughtException = true;
 		}
-
-		ASSERT_EQ(caughtException, true);
+		ASSERT_TRUE(caughtException);
 	}
 }
 
 /**
  * @brief Test reading a packet capture from live from a BitStream
  */
-TEST(dCommonTests, AMFDeserializeLivePacketTest) {
+TEST(dCommonTests, Amf3DeserializeLivePacketTest) {
 	std::ifstream testFileStream;
 	testFileStream.open("AMFBitStreamTest.bin", std::ios::binary);
 
@@ -354,7 +353,7 @@ TEST(dCommonTests, AMFDeserializeLivePacketTest) {
 /**
  * @brief Tests that having no BitStream returns a nullptr.
  */
-TEST(dCommonTests, AMFDeserializeNullTest) {
+TEST(dCommonTests, Amf3DeserializeNullTest) {
 	auto result = ReadFromBitStream(nullptr);
 	ASSERT_EQ(result.get(), nullptr);
 }

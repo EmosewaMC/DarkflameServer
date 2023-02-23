@@ -6,7 +6,7 @@
 #include <string>
 
 class AMFValue;
-class AMFDeserialize {
+class Amf3Deserialize {
 public:
 	/**
 	 * Read an AMF3 value from a bitstream.
