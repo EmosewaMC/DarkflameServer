@@ -71,6 +71,7 @@
 #include "LUPExhibitComponent.h"
 #include "TriggerComponent.h"
 #include "eReplicaComponentType.h"
+#include "GhostComponent.h"
 
 // Table includes
 #include "CDComponentsRegistryTable.h"
@@ -434,6 +435,11 @@ void Entity::Initialize() {
 		CharacterComponent* charComp = new CharacterComponent(this, m_Character);
 		charComp->LoadFromXml(m_Character->GetXMLDoc());
 		m_Components.insert(std::make_pair(eReplicaComponentType::CHARACTER, charComp));
+
+		// Technically this is suppsed to be attached to many Entities, however only Players need it right now
+		auto* ghostComponent = new GhostComponent(this);
+		m_Components.insert(std::make_pair(eReplicaComponentType::GHOST, ghostComponent));
+		ghostComponent->LoadFromXml(m_Character->GetXMLDoc());
 	}
 
 	if (compRegistryTable->GetByIDAndType(m_TemplateID, eReplicaComponentType::INVENTORY) > 0 || m_Character) {

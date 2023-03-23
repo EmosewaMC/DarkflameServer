@@ -76,6 +76,7 @@
 #include "TriggerComponent.h"
 #include "eServerDisconnectIdentifiers.h"
 #include "eReplicaComponentType.h"
+#include "GhostComponent.h"
 
 #include "CDObjectsTable.h"
 #include "CDZoneTableTable.h"
@@ -145,11 +146,15 @@ void SlashCommandHandler::HandleChatCommand(const std::u16string& command, Entit
 		bool success = user->GetMaxGMLevel() >= level;
 
 		if (success) {
-
-			if (entity->GetGMLevel() > GAME_MASTER_LEVEL_CIVILIAN && level == GAME_MASTER_LEVEL_CIVILIAN) {
-				GameMessages::SendToggleGMInvis(entity->GetObjectID(), false, UNASSIGNED_SYSTEM_ADDRESS);
-			} else if (entity->GetGMLevel() == GAME_MASTER_LEVEL_CIVILIAN && level > GAME_MASTER_LEVEL_CIVILIAN) {
-				GameMessages::SendToggleGMInvis(entity->GetObjectID(), true, UNASSIGNED_SYSTEM_ADDRESS);
+			auto* ghostComponent = entity->GetComponent<GhostComponent>();
+			if (!ghostComponent) {
+				Game::logger->Log("SlashCommandHandler", "No ghost on a player to make invisible.");
+			} else {
+				if (entity->GetGMLevel() > GAME_MASTER_LEVEL_CIVILIAN && level == GAME_MASTER_LEVEL_CIVILIAN) {
+					ghostComponent->SetInvisible(false);
+				} else if (entity->GetGMLevel() == GAME_MASTER_LEVEL_CIVILIAN && level > GAME_MASTER_LEVEL_CIVILIAN) {
+					ghostComponent->SetInvisible(true);
+				}
 			}
 
 			WorldPackets::SendGMLevelChange(sysAddr, success, user->GetMaxGMLevel(), entity->GetGMLevel(), level);
@@ -164,8 +169,10 @@ void SlashCommandHandler::HandleChatCommand(const std::u16string& command, Entit
 		WorldPackets::SendGMLevelChange(sysAddr, true, user->GetMaxGMLevel(), entity->GetGMLevel(), GAME_MASTER_LEVEL_CIVILIAN);
 		GameMessages::SendChatModeUpdate(entity->GetObjectID(), GAME_MASTER_LEVEL_CIVILIAN);
 		entity->SetGMLevel(GAME_MASTER_LEVEL_CIVILIAN);
-
-		GameMessages::SendToggleGMInvis(entity->GetObjectID(), false, UNASSIGNED_SYSTEM_ADDRESS);
+		auto* ghostComponent = entity->GetComponent<GhostComponent>();
+		if (ghostComponent && entity->GetGMLevel()) {
+			ghostComponent->SetInvisible(false);
+		}
 
 		ChatPackets::SendSystemMessage(sysAddr, u"Your game master level has been changed, you may not be able to use all commands.");
 	}
@@ -247,7 +254,7 @@ void SlashCommandHandler::HandleChatCommand(const std::u16string& command, Entit
 	}
 
 	if (chatCommand == "credits" || chatCommand == "info") {
-		const auto& customText = chatCommand == "credits" ? VanityUtilities::ParseMarkdown((BinaryPathFinder::GetBinaryDir() / "vanity/CREDITS.md").string()) : VanityUtilities::ParseMarkdown((BinaryPathFinder::GetBinaryDir() /  "vanity/INFO.md").string());
+		const auto& customText = chatCommand == "credits" ? VanityUtilities::ParseMarkdown((BinaryPathFinder::GetBinaryDir() / "vanity/CREDITS.md").string()) : VanityUtilities::ParseMarkdown((BinaryPathFinder::GetBinaryDir() / "vanity/INFO.md").string());
 
 		{
 			AMFArrayValue args;
@@ -378,10 +385,10 @@ void SlashCommandHandler::HandleChatCommand(const std::u16string& command, Entit
 			ChatPackets::SendSystemMessage(sysAddr, u"Invalid Minifig Item Id ID.");
 			return;
 		}
-		EntityManager::Instance()->DestructEntity(entity, sysAddr);
 		auto* charComp = entity->GetComponent<CharacterComponent>();
 		std::string lowerName = args[0];
 		if (lowerName.empty()) return;
+		auto* ghostComponent = entity->GetComponent<GhostComponent>();
 		std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(), ::tolower);
 		if (lowerName == "eyebrows") {
 			charComp->m_Character->SetEyebrows(minifigItemId);
@@ -405,15 +412,20 @@ void SlashCommandHandler::HandleChatCommand(const std::u16string& command, Entit
 			charComp->m_Character->SetLeftHand(minifigItemId);
 			charComp->m_Character->SetRightHand(minifigItemId);
 		} else {
-			EntityManager::Instance()->ConstructEntity(entity);
 			ChatPackets::SendSystemMessage(sysAddr, u"Invalid Minifig item to change, try one of the following: Eyebrows, Eyes, HairColor, HairStyle, Pants, LeftHand, Mouth, RightHand, Shirt, Hands");
 			return;
 		}
-
+		bool previousInvisState = false;
+		if (ghostComponent) {
+			previousInvisState = ghostComponent->GetIsInvisible();
+			ghostComponent->SetInvisible(false);
+		}
+		EntityManager::Instance()->DestructEntity(entity, sysAddr);
 		EntityManager::Instance()->ConstructEntity(entity);
 		ChatPackets::SendSystemMessage(sysAddr, GeneralUtils::ASCIIToUTF16(lowerName) + u" set to " + (GeneralUtils::to_u16string(minifigItemId)));
-
-		GameMessages::SendToggleGMInvis(entity->GetObjectID(), false, UNASSIGNED_SYSTEM_ADDRESS); // need to retoggle because it gets reenabled on creation of new character
+		if (ghostComponent) {
+			ghostComponent->SetInvisible(previousInvisState);
+		}
 	}
 
 	if ((chatCommand == "playanimation" || chatCommand == "playanim") && args.size() == 1 && entity->GetGMLevel() >= GAME_MASTER_LEVEL_DEVELOPER) {
@@ -1485,10 +1497,11 @@ void SlashCommandHandler::HandleChatCommand(const std::u16string& command, Entit
 		ch->SetCoins(money, eLootSourceType::LOOT_SOURCE_MODERATION);
 	}
 
-	// Allow for this on even while not a GM, as it sometimes toggles incorrrectly.
 	if (chatCommand == "gminvis" && entity->GetParentUser()->GetMaxGMLevel() >= GAME_MASTER_LEVEL_DEVELOPER) {
-		GameMessages::SendToggleGMInvis(entity->GetObjectID(), true, UNASSIGNED_SYSTEM_ADDRESS);
-
+		auto* ghostComponent = entity->GetComponent<GhostComponent>();
+		if (ghostComponent) {
+			ghostComponent->SetInvisible(!ghostComponent->GetIsInvisible());
+		}
 		return;
 	}
 

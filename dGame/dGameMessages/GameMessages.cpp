@@ -1906,10 +1906,10 @@ void GameMessages::SendToggleGMInvis(LWOOBJID objectId, bool enabled, const Syst
 
 	bitStream.Write(objectId);
 	bitStream.Write(GAME_MSG::GAME_MSG_TOGGLE_GM_INVIS);
-	bitStream.Write(enabled); // does not matter?
+	bitStream.Write(enabled);
 
-	if (sysAddr == UNASSIGNED_SYSTEM_ADDRESS) SEND_PACKET_BROADCAST;
-	SEND_PACKET;
+	if (sysAddr == UNASSIGNED_SYSTEM_ADDRESS) SEND_PACKET_BROADCAST
+	else SEND_PACKET
 }
 
 void GameMessages::SendSetName(LWOOBJID objectID, std::u16string name, const SystemAddress& sysAddr) {
