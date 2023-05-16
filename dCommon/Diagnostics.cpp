@@ -112,59 +112,39 @@ void GenerateDump() {
 	std::string cmd = "sudo gcore " + std::to_string(getpid());
 	int ret = system(cmd.c_str()); // Saving a return just to prevent warning
 }
-
+#include <memory>
+#include <string.h>
+#include <cxxabi.h>
 void CatchUnhandled(int sig) {
 #ifndef __include_backtrace__
+	LogError("Encountered signal %i", sig);
+	if (Diagnostics::GetProduceMemoryDump()) GenerateDump();
 
-	std::string fileName = Diagnostics::GetOutDirectory() + "crash_" + Diagnostics::GetProcessName() + "_" + std::to_string(getpid()) + ".log";
-	Log("Encountered signal %i, creating crash dump %s", sig, fileName.c_str());
-	if (Diagnostics::GetProduceMemoryDump()) {
-		GenerateDump();
-	}
+	// Hopefully 32 function calls is enough to get a full stack trace.  There is not much recursion in the codebase.
+	std::array<void*, 32> array;
+	// Get mangled names for the backtrace
+	size_t size = backtrace(array.data(), 32);
+	char** strings = backtrace_symbols(array.data(), size);
 
-	void* array[10];
-	size_t size;
+	// Deleter for abi::__cxa_demangle because it requires that the caller free the memory.
+	auto deleter = [](char* ptr) {
+		free(ptr);
+	};
 
-	// get void*'s for all entries on the stack
-	size = backtrace(array, 10);
-
-#if defined(__GNUG__) and defined(__dynamic)
-
-	// Loop through the returned addresses, and get the symbols to be demangled
-	char** strings = backtrace_symbols(array, size);
-
-	// Print the stack trace
-	for (size_t i = 0; i < size; i++) {
-		// Take a string like './WorldServer(_ZN19SlashCommandHandler17HandleChatCommandERKSbIDsSt11char_traitsIDsESaIDsEEP6EntityRK13SystemAddress+0x6187) [0x55869c44ecf7]' and extract the function name
-		std::string functionName = strings[i];
-		std::string::size_type start = functionName.find('(');
-		std::string::size_type end = functionName.find('+');
-		if (start != std::string::npos && end != std::string::npos) {
-			std::string demangled = functionName.substr(start + 1, end - start - 1);
-
-			demangled = demangle(functionName.c_str());
-
-			if (demangled.empty()) {
-				Log("[%02zu] %s", i, demangled.c_str());
-			} else {
-				Log("[%02zu] %s", i, functionName.c_str());
-			}
-		} else {
-			Log("[%02zu] %s", i, functionName.c_str());
+	for (uint32_t i = 0; i < size; i++) {
+		std::string mangled = strings[i];
+		auto start = mangled.find('(');
+		auto end = mangled.find("+");
+		std::string toDemangle = mangled.substr(start + 1, end - start - 1);
+		int err = 0;
+		std::unique_ptr<char, decltype(deleter)> demangled(abi::__cxa_demangle(toDemangle.c_str(), nullptr, nullptr, &err), deleter);
+		if (err == 0) { // Successfull demangle
+			Log("%s", demangled.get());
+		}
+		else if(!toDemangle.empty() && toDemangle.front() != '+') { // Filter out empty traces and traces that are just an offset.
+			Log("%s", toDemangle.c_str());
 		}
 	}
-#else
-	backtrace_symbols_fd(array, size, STDOUT_FILENO);
-#endif
-
-	FILE* file = fopen(fileName.c_str(), "w+");
-	if (file != NULL) {
-		// print out all the frames to stderr
-		fprintf(file, "Error: signal %d:\n", sig);
-		backtrace_symbols_fd(array, size, fileno(file));
-		fclose(file);
-	}
-
 #else
 
 	struct backtrace_state* state = backtrace_create_state(
@@ -177,7 +157,7 @@ void CatchUnhandled(int sig) {
 	Bt(state);
 
 #endif
-
+	FlushLog;
 	exit(EXIT_FAILURE);
 }
 
