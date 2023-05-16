@@ -61,15 +61,10 @@ public:
 	void SetLogDebug(bool logDebugStatements) { m_logDebugStatements = logDebugStatements; }
 	inline void Flush() { m_File.flush(); };
 private:
-	void _Log(const char* filename, const char* format, LogLevel logLevel, va_list args);
+	void _Log(const char* location, const char* format, LogLevel logLevel, va_list args);
 
 	bool m_logToConsole;
 	bool m_logDebugStatements;
 	std::ofstream m_File;
-
-	// Use the color codes for the console output
-	static std::vector<std::string> consoleLogLevel;
-	// Do not use color codes when writing to log files
-	static std::vector<std::string> fileLogLevel;
 };
 #endif  //!__LOGGER__H__
