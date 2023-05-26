@@ -26,7 +26,6 @@ private:
 	uint64_t currentRequestID;                  //!< The current request ID
 
 	uint32_t currentObjectID;                   //!< The current object ID
-
 public:
 
 	//! The singleton instance
