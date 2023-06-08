@@ -71,6 +71,7 @@
 #include "eMasterMessageType.h"
 #include "eGameMessageType.h"
 #include "ZCompression.h"
+#include "CharacterMigrations.h"
 
 namespace Game {
 	dLogger* logger = nullptr;
@@ -1044,11 +1045,15 @@ void HandlePacket(Packet* packet) {
 					case eCharacterVersion::VAULT_SIZE:
 						Game::logger->Log("WorldServer", "Updaing Speedbase");
 						levelComponent->SetRetroactiveBaseSpeed();
+						levelComponent->SetCharacterVersion(eCharacterVersion::META_TASK);
+					case eCharacterVersion::META_TASK:
+						Game::logger->Log("WorldServer", "Updating Meta Task for %s %llu", player->GetCharacter()->GetName().c_str(), player->GetObjectID());
+						CharacterMigrations::RetriggerMetaMission(player);
 						levelComponent->SetCharacterVersion(eCharacterVersion::UP_TO_DATE);
 					case eCharacterVersion::UP_TO_DATE:
 						break;
 				}
-
+				
 				player->GetCharacter()->SetTargetScene("");
 
 				// Fix the destroyable component
