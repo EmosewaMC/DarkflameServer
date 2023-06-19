@@ -1,5 +1,6 @@
 #include "InventoryComponent.h"
 
+#include <memory>
 #include <sstream>
 
 #include "Entity.h"
@@ -31,6 +32,7 @@
 #include "eMissionTaskType.h"
 #include "eStateChangeType.h"
 #include "eUseItemResponse.h"
+#include "Database.h"
 
 #include "CDComponentsRegistryTable.h"
 #include "CDInventoryComponentTable.h"
@@ -1592,22 +1594,35 @@ void InventoryComponent::LoadPetXml(tinyxml2::XMLDocument* document) {
 		return;
 	}
 
+	if (!m_Parent->GetCharacter()) {
+		Game::logger->Log("InventoryComponent", "Trying to load pets from a non-character for %llu:%i", m_Parent->GetObjectID(), m_Parent->GetLOT());
+		return;
+	}
+
 	auto* petElement = petInventoryElement->FirstChildElement();
+
+	std::unique_ptr<sql::PreparedStatement> petNames(Database::CreatePreppedStmt("SELECT * FROM pet_names WHERE id = ?;"));
+	petNames->setInt(1, m_Parent->GetCharacter()->GetID());
+	std::unique_ptr<sql::ResultSet> petNamesResult(petNames->executeQuery());
 
 	while (petElement != nullptr) {
 		LWOOBJID id;
-		LOT lot;
-		int32_t moderationStatus;
-
 		petElement->QueryAttribute("id", &id);
-		petElement->QueryAttribute("l", &lot);
-		petElement->QueryAttribute("m", &moderationStatus);
-		const char* name = petElement->Attribute("n");
 
 		DatabasePet databasePet;
-		databasePet.lot = lot;
-		databasePet.moderationState = moderationStatus;
-		databasePet.name = std::string(name);
+		petElement->QueryAttribute("m", &databasePet.moderationState);
+		// Verify that the pet name matches the pet name in the database. If it doesnt match, update the xml with the database name.
+		while (petNamesResult->next()) {
+			if (petNamesResult->getInt("id") == id || petNamesResult->getInt("approved") != databasePet.moderationState) {
+				petElement->SetAttribute("m", petNamesResult->getInt("approved"));
+				petElement->SetAttribute("n", petNamesResult->getString("pet_name").c_str());
+				break;
+			}
+		}
+		petNamesResult->first(); // Reset the result set to the first row to we can reuse the same query
+		databasePet.name = petElement->Attribute("n");
+		petElement->QueryAttribute("m", &databasePet.moderationState);
+		petElement->QueryAttribute("l", &databasePet.lot);
 
 		SetDatabasePet(id, databasePet);
 

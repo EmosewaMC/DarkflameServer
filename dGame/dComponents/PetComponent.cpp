@@ -68,7 +68,7 @@ std::map<LOT, int32_t> PetComponent::petFlags = {
 		{ 13067, 838 }, // Skeleton dragon
 };
 
-PetComponent::PetComponent(Entity* parent, uint32_t componentId): Component(parent) {
+PetComponent::PetComponent(Entity* parent, uint32_t componentId) : Component(parent) {
 	m_ComponentId = componentId;
 
 	m_Interaction = LWOOBJID_EMPTY;
@@ -861,18 +861,14 @@ void PetComponent::Activate(Item* item, bool registerPet, bool fromTaming) {
 	bool updatedModerationStatus = false;
 
 	//Load mod status from db:
-	if (m_ModerationStatus != 2) {
-		LoadPetNameFromModeration();
+	LoadPetNameFromModeration();
 
-		databaseData.name = m_Name;
-		databaseData.moderationState = m_ModerationStatus;
+	databaseData.name = m_Name;
+	databaseData.moderationState = m_ModerationStatus;
 
-		inventoryComponent->SetDatabasePet(m_DatabaseId, databaseData);
+	inventoryComponent->SetDatabasePet(m_DatabaseId, databaseData);
 
-		updatedModerationStatus = true;
-	} else {
-		m_Name = databaseData.name;
-	}
+	updatedModerationStatus = true;
 
 	m_OwnerName = owner->GetCharacter()->GetName();
 
@@ -927,16 +923,16 @@ void PetComponent::AddDrainImaginationTimer(Item* item, bool fromTaming) {
 			return;
 		}
 
-	// If we are out of imagination despawn the pet.
-	if (playerDestroyableComponent->GetImagination() == 0) {
-		this->Deactivate();
-		auto playerEntity = playerDestroyableComponent->GetParent();
-		if (!playerEntity) return;
+		// If we are out of imagination despawn the pet.
+		if (playerDestroyableComponent->GetImagination() == 0) {
+			this->Deactivate();
+			auto playerEntity = playerDestroyableComponent->GetParent();
+			if (!playerEntity) return;
 
-		GameMessages::SendUseItemRequirementsResponse(playerEntity->GetObjectID(), playerEntity->GetSystemAddress(), eUseItemResponse::NoImaginationForPet);
-	}
+			GameMessages::SendUseItemRequirementsResponse(playerEntity->GetObjectID(), playerEntity->GetSystemAddress(), eUseItemResponse::NoImaginationForPet);
+		}
 
-	this->AddDrainImaginationTimer(item);
+		this->AddDrainImaginationTimer(item);
 		});
 }
 
