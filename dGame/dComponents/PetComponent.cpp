@@ -19,6 +19,7 @@
 #include "ePetTamingNotifyType.h"
 #include "eUseItemResponse.h"
 #include "ePlayerFlag.h"
+#include "eStateChangeType.h"
 
 #include "Game.h"
 #include "dConfig.h"
@@ -286,6 +287,18 @@ void PetComponent::OnUse(Entity* originator) {
 	auto rotation = NiQuaternion::LookAt(position, petPosition);
 
 	GameMessages::SendNotifyPetTamingMinigame(
+		m_Parent->GetObjectID(),
+		LWOOBJID_EMPTY,
+		originator->GetObjectID(),
+		false,
+		ePetTamingNotifyType::BEGIN,
+		NiPoint3::ZERO,
+		NiPoint3::ZERO,
+		NiQuaternion(0, 0, 0, 0),
+		UNASSIGNED_SYSTEM_ADDRESS
+	);
+
+	GameMessages::SendNotifyPetTamingMinigame(
 		originator->GetObjectID(),
 		m_Parent->GetObjectID(),
 		LWOOBJID_EMPTY,
@@ -297,17 +310,7 @@ void PetComponent::OnUse(Entity* originator) {
 		UNASSIGNED_SYSTEM_ADDRESS
 	);
 
-	GameMessages::SendNotifyPetTamingMinigame(
-		m_Parent->GetObjectID(),
-		LWOOBJID_EMPTY,
-		originator->GetObjectID(),
-		true,
-		ePetTamingNotifyType::BEGIN,
-		petPosition,
-		position,
-		rotation,
-		UNASSIGNED_SYSTEM_ADDRESS
-	);
+	GameMessages::SendSetStunned(originator->GetObjectID(), eStateChangeType::PUSH, originator->GetSystemAddress(), LWOOBJID_EMPTY, true, true, false, false, false, false, true, false, true);
 
 	GameMessages::SendNotifyPetTamingPuzzleSelected(originator->GetObjectID(), bricks, originator->GetSystemAddress());
 
@@ -683,6 +686,7 @@ void PetComponent::RequestSetPetName(std::u16string name) {
 	);
 
 	GameMessages::SendTerminateInteraction(m_Tamer, eTerminateType::FROM_INTERACTION, m_Parent->GetObjectID());
+	GameMessages::SendSetStunned(m_Tamer, eStateChangeType::POP, tamer->GetSystemAddress(), LWOOBJID_EMPTY, true, true, false, false, false, false, true, false, true);
 
 	auto* modelEntity = EntityManager::Instance()->GetEntity(m_ModelId);
 
@@ -726,6 +730,7 @@ void PetComponent::ClientExitTamingMinigame(bool voluntaryExit) {
 	GameMessages::SendNotifyTamingModelLoadedOnServer(m_Tamer, tamer->GetSystemAddress());
 
 	GameMessages::SendTerminateInteraction(m_Tamer, eTerminateType::FROM_INTERACTION, m_Parent->GetObjectID());
+	GameMessages::SendSetStunned(m_Tamer, eStateChangeType::POP, tamer->GetSystemAddress(), LWOOBJID_EMPTY, true, true, false, false, false, false, true, false, true);
 
 	currentActivities.erase(m_Tamer);
 
@@ -777,6 +782,7 @@ void PetComponent::ClientFailTamingMinigame() {
 	GameMessages::SendNotifyTamingModelLoadedOnServer(m_Tamer, tamer->GetSystemAddress());
 
 	GameMessages::SendTerminateInteraction(m_Tamer, eTerminateType::FROM_INTERACTION, m_Parent->GetObjectID());
+	GameMessages::SendSetStunned(m_Tamer, eStateChangeType::POP, tamer->GetSystemAddress(), LWOOBJID_EMPTY, true, true, false, false, false, false, true, false, true);
 
 	currentActivities.erase(m_Tamer);
 
