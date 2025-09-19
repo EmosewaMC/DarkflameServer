@@ -5,6 +5,10 @@
 #include "NiPoint3.h"
 #include "NiQuaternion.h"
 
+namespace GameMessages {
+	struct GetObjectReportInfo;
+};
+
 namespace Raknet {
 	class BitStream;
 };
@@ -20,7 +24,7 @@ public:
 
 	void Serialize(RakNet::BitStream& outBitStream, bool bIsInitialUpdate) override;
 
-	const NiPoint3& GetPosition() const { return m_Position; }
+	const NiPoint3& GetPosition() const noexcept { return m_Position; }
 	virtual void SetPosition(const NiPoint3& pos) { if (m_Position == pos) return; m_Position = pos; m_DirtyPosition = true; }
 
 	const NiQuaternion& GetRotation() const { return m_Rotation; }
@@ -29,15 +33,19 @@ public:
 	int32_t GetCollisionGroup() const noexcept { return m_CollisionGroup; }
 	void SetCollisionGroup(int32_t group) noexcept { m_CollisionGroup = group; }
 protected:
+	bool OnGetObjectReportInfo(GameMessages::GameMsg& msg);
+
 	dpEntity* CreatePhysicsEntity(eReplicaComponentType type);
 
 	dpEntity* CreatePhysicsLnv(const float scale, const eReplicaComponentType type) const;
 
 	void SpawnVertices(dpEntity* entity) const;
 
+	bool OnGetPosition(GameMessages::GameMsg& msg);
+
 	NiPoint3 m_Position;
 
-	NiQuaternion m_Rotation;
+	NiQuaternion m_Rotation = QuatUtils::IDENTITY;
 
 	bool m_DirtyPosition;
 

@@ -31,8 +31,8 @@ namespace WorldPackets {
 	void SendCharacterDeleteResponse(const SystemAddress& sysAddr, bool response);
 	void SendTransferToWorld(const SystemAddress& sysAddr, const std::string& serverIP, uint32_t serverPort, bool mythranShift);
 	void SendServerState(const SystemAddress& sysAddr);
-	void SendCreateCharacter(const SystemAddress& sysAddr, int64_t reputation, LWOOBJID player, const std::string& xmlData, const std::u16string& username, eGameMasterLevel gm);
-	void SendChatModerationResponse(const SystemAddress& sysAddr, bool requestAccepted, uint32_t requestID, const std::string& receiver, std::vector<std::pair<uint8_t, uint8_t>> unacceptedItems);
+	void SendCreateCharacter(const SystemAddress& sysAddr, int64_t reputation, LWOOBJID player, const std::string& xmlData, const std::u16string& username, eGameMasterLevel gm, const LWOCLONEID cloneID);
+	void SendChatModerationResponse(const SystemAddress& sysAddr, bool requestAccepted, uint32_t requestID, const std::string& receiver, std::set<std::pair<uint8_t, uint8_t>> unacceptedItems);
 	void SendGMLevelChange(const SystemAddress& sysAddr, bool success, eGameMasterLevel highestLevel, eGameMasterLevel prevLevel, eGameMasterLevel newLevel);
 	void SendHTTPMonitorInfo(const SystemAddress& sysAddr, const HTTPMonitorInfo& info);
 	void SendDebugOuput(const SystemAddress& sysAddr, const std::string& data);

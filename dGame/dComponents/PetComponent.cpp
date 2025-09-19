@@ -42,35 +42,6 @@ std::unordered_map<LWOOBJID, LWOOBJID> PetComponent::activePets{};
  * Maps all the pet lots to a flag indicating that the player has caught it. All basic pets have been guessed by ObjID
  * while the faction ones could be checked using their respective missions.
  */
-const std::map<LOT, int32_t> PetComponent::petFlags{
-		{ 3050, 801 },  // Elephant
-		{ 3054, 803 },  // Cat
-		{ 3195, 806 },  // Triceratops
-		{ 3254, 807 },  // Terrier
-		{ 3261, 811 },  // Skunk
-		{ 3672, 813 },  // Bunny
-		{ 3994, 814 },  // Crocodile
-		{ 5635, 815 },  // Doberman
-		{ 5636, 816 },  // Buffalo
-		{ 5637, 818 },  // Robot Dog
-		{ 5639, 819 },  // Red Dragon
-		{ 5640, 820 },  // Tortoise
-		{ 5641, 821 },  // Green Dragon
-		{ 5643, 822 },  // Panda, see mission 786
-		{ 5642, 823 },  // Mantis
-		{ 6720, 824 },  // Warthog
-		{ 3520, 825 },  // Lion, see mission 1318
-		{ 7638, 826 },  // Goat
-		{ 7694, 827 },  // Crab
-		{ 12294, 829 }, // Reindeer
-		{ 12431, 830 }, // Stegosaurus, see mission 1386
-		{ 12432, 831 }, // Saber cat, see mission 1389
-		{ 12433, 832 }, // Gryphon, see mission 1392
-		{ 12434, 833 }, // Alien, see mission 1188
-		// 834: unknown?, see mission 506, 688
-		{ 16210, 836 },  // Ninjago Earth Dragon, see mission 1836
-		{ 13067, 838 }, // Skeleton dragon
-};
 
 PetComponent::PetComponent(Entity* parentEntity, uint32_t componentId) : Component{ parentEntity } {
 	m_PetInfo = CDClientManager::GetTable<CDPetComponentTable>()->GetByID(componentId); // TODO: Make reference when safe
@@ -197,7 +168,7 @@ void PetComponent::OnUse(Entity* originator) {
 
 	const auto originatorPosition = originator->GetPosition();
 
-	m_Parent->SetRotation(NiQuaternion::LookAt(petPosition, originatorPosition));
+	m_Parent->SetRotation(QuatUtils::LookAt(petPosition, originatorPosition));
 
 	float interactionDistance = m_Parent->GetVar<float>(u"interaction_distance");
 	if (interactionDistance <= 0) {
@@ -206,7 +177,7 @@ void PetComponent::OnUse(Entity* originator) {
 
 	auto position = originatorPosition;
 
-	NiPoint3 forward = NiQuaternion::LookAt(m_Parent->GetPosition(), originator->GetPosition()).GetForwardVector();
+	NiPoint3 forward = QuatUtils::Forward(QuatUtils::LookAt(m_Parent->GetPosition(), originator->GetPosition()));
 	forward.y = 0;
 
 	if (dpWorld::IsLoaded()) {
@@ -215,7 +186,7 @@ void PetComponent::OnUse(Entity* originator) {
 		NiPoint3 nearestPoint = dpWorld::GetNavMesh()->NearestPoint(attempt);
 
 		while (std::abs(nearestPoint.y - petPosition.y) > 4 && interactionDistance > 10) {
-			const NiPoint3 forward = m_Parent->GetRotation().GetForwardVector();
+			const NiPoint3 forward = QuatUtils::Forward(m_Parent->GetRotation());
 
 			attempt = originatorPosition + forward * interactionDistance;
 
@@ -229,7 +200,7 @@ void PetComponent::OnUse(Entity* originator) {
 		position = petPosition + forward * interactionDistance;
 	}
 
-	auto rotation = NiQuaternion::LookAt(position, petPosition);
+	auto rotation = QuatUtils::LookAt(position, petPosition);
 
 	GameMessages::SendNotifyPetTamingMinigame(
 		originator->GetObjectID(),
@@ -489,7 +460,7 @@ void PetComponent::NotifyTamingBuildSuccess(NiPoint3 position) {
 	EntityInfo info{};
 	info.lot = entry->puzzleModelLot;
 	info.pos = position;
-	info.rot = NiQuaternionConstant::IDENTITY;
+	info.rot = QuatUtils::IDENTITY;
 	info.spawnerID = tamer->GetObjectID();
 
 	auto* modelEntity = Game::entityManager->CreateEntity(info);
@@ -551,14 +522,13 @@ void PetComponent::NotifyTamingBuildSuccess(NiPoint3 position) {
 		ePetTamingNotifyType::NAMINGPET,
 		NiPoint3Constant::ZERO,
 		NiPoint3Constant::ZERO,
-		NiQuaternionConstant::IDENTITY,
+		QuatUtils::IDENTITY,
 		UNASSIGNED_SYSTEM_ADDRESS
 	);
 
 	// Triggers the catch a pet missions
-	if (petFlags.find(m_Parent->GetLOT()) != petFlags.end()) {
-		tamer->GetCharacter()->SetPlayerFlag(petFlags.at(m_Parent->GetLOT()), true);
-	}
+	constexpr auto PET_FLAG_BASE = 800;
+	tamer->GetCharacter()->SetPlayerFlag(PET_FLAG_BASE + m_ComponentId, true);
 
 	auto* missionComponent = tamer->GetComponent<MissionComponent>();
 
@@ -631,7 +601,7 @@ void PetComponent::RequestSetPetName(std::u16string name) {
 		ePetTamingNotifyType::SUCCESS,
 		NiPoint3Constant::ZERO,
 		NiPoint3Constant::ZERO,
-		NiQuaternionConstant::IDENTITY,
+		QuatUtils::IDENTITY,
 		UNASSIGNED_SYSTEM_ADDRESS
 	);
 
@@ -675,7 +645,7 @@ void PetComponent::ClientExitTamingMinigame(bool voluntaryExit) {
 		ePetTamingNotifyType::QUIT,
 		NiPoint3Constant::ZERO,
 		NiPoint3Constant::ZERO,
-		NiQuaternionConstant::IDENTITY,
+		QuatUtils::IDENTITY,
 		UNASSIGNED_SYSTEM_ADDRESS
 	);
 
@@ -726,7 +696,7 @@ void PetComponent::ClientFailTamingMinigame() {
 		ePetTamingNotifyType::FAILED,
 		NiPoint3Constant::ZERO,
 		NiPoint3Constant::ZERO,
-		NiQuaternionConstant::IDENTITY,
+		QuatUtils::IDENTITY,
 		UNASSIGNED_SYSTEM_ADDRESS
 	);
 
@@ -942,6 +912,11 @@ void PetComponent::Command(const NiPoint3& position, const LWOOBJID source, cons
 	if (commandType == 1) {
 		// Emotes
 		GameMessages::SendPlayEmote(m_Parent->GetObjectID(), typeId, owner->GetObjectID(), UNASSIGNED_SYSTEM_ADDRESS);
+		GameMessages::EmotePlayed msg;
+		msg.target = owner->GetObjectID();
+		msg.emoteID = typeId;
+		msg.targetID = 0; // Or set to the intended target entity's ID, or 0 if no target
+		msg.Send(UNASSIGNED_SYSTEM_ADDRESS);
 	} else if (commandType == 3) {
 		// Follow me, ???
 	} else if (commandType == 6) {

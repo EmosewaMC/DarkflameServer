@@ -13,13 +13,14 @@
 #include "Diagnostics.h"
 #include "AssetManager.h"
 #include "BinaryPathFinder.h"
-#include "eConnectionType.h"
+#include "ServiceType.h"
 #include "PlayerContainer.h"
 #include "ChatPacketHandler.h"
 #include "MessageType/Chat.h"
 #include "MessageType/World.h"
 #include "ChatIgnoreList.h"
 #include "StringifiedEnum.h"
+#include "TeamContainer.h"
 
 #include "Game.h"
 #include "Server.h"
@@ -28,7 +29,7 @@
 #include "RakNetDefines.h"
 #include "MessageIdentifiers.h"
 
-#include "ChatWebAPI.h"
+#include "ChatWeb.h"
 
 namespace Game {
 	Logger* logger = nullptr;
@@ -92,17 +93,18 @@ int main(int argc, char** argv) {
 		return EXIT_FAILURE;
 	}
 
-	// seyup the chat api web server
-	bool web_server_enabled = Game::config->GetValue("web_server_enabled") == "1";
-	ChatWebAPI chatwebapi;
-	if (web_server_enabled && !chatwebapi.Startup()){
-		// if we want the web api and it fails to start, exit
+	// setup the chat api web server
+	const uint32_t web_server_port = GeneralUtils::TryParse<uint32_t>(Game::config->GetValue("web_server_port")).value_or(2005);
+	if (Game::config->GetValue("web_server_enabled") == "1" && !Game::web.Startup("localhost", web_server_port)) {
+		// if we want the web server and it fails to start, exit
 		LOG("Failed to start web server, shutting down.");
 		Database::Destroy("ChatServer");
 		delete Game::logger;
 		delete Game::config;
 		return EXIT_FAILURE;
-	};
+	}
+
+	if (Game::web.IsEnabled()) ChatWeb::RegisterRoutes();
 
 	//Find out the master's IP:
 	std::string masterIP;
@@ -121,7 +123,7 @@ int main(int argc, char** argv) {
 	const auto externalIPString = Game::config->GetValue("external_ip");
 	if (!externalIPString.empty()) ourIP = externalIPString;
 
-	Game::server = new dServer(ourIP, ourPort, 0, maxClients, false, true, Game::logger, masterIP, masterPort, ServerType::Chat, Game::config, &Game::lastSignal, masterPassword);
+	Game::server = new dServer(ourIP, ourPort, 0, maxClients, false, true, Game::logger, masterIP, masterPort, ServiceType::CHAT, Game::config, &Game::lastSignal, masterPassword);
 
 	const bool dontGenerateDCF = GeneralUtils::TryParse<bool>(Game::config->GetValue("dont_generate_dcf")).value_or(false);
 	Game::chatFilter = new dChatFilter(Game::assetManager->GetResPath().string() + "/chatplus_en_us", dontGenerateDCF);
@@ -166,10 +168,8 @@ int main(int argc, char** argv) {
 			packet = nullptr;
 		}
 
-		//Check and handle web requests:
-		if (web_server_enabled) {
-			chatwebapi.ReceiveRequests();
-		}
+		// Check and handle web requests:
+		if (Game::web.IsEnabled()) Game::web.ReceiveRequests();
 
 		//Push our log every 30s:
 		if (framesSinceLastFlush >= logFlushTime) {
@@ -197,6 +197,7 @@ int main(int argc, char** argv) {
 		std::this_thread::sleep_until(t);
 	}
 	Game::playerContainer.Shutdown();
+	TeamContainer::Shutdown();
 	//Delete our objects here:
 	Database::Destroy("ChatServer");
 	delete Game::server;
@@ -217,12 +218,16 @@ void HandlePacket(Packet* packet) {
 	CINSTREAM;
 	inStream.SetReadOffset(BYTES_TO_BITS(1));
 
-	eConnectionType connection;
-	MessageType::Chat chatMessageID;
-
+	ServiceType connection;
 	inStream.Read(connection);
-	if (connection != eConnectionType::CHAT) return;
+	if (connection != ServiceType::CHAT) return;
+
+	MessageType::Chat chatMessageID;
 	inStream.Read(chatMessageID);
+
+	// Our packing byte wasnt there? Probably a false packet
+	if (inStream.GetNumberOfUnreadBits() < 8) return;
+	inStream.IgnoreBytes(1);
 
 	switch (chatMessageID) {
 	case MessageType::Chat::GM_MUTE:
@@ -230,7 +235,7 @@ void HandlePacket(Packet* packet) {
 		break;
 
 	case MessageType::Chat::CREATE_TEAM:
-		Game::playerContainer.CreateTeamServer(packet);
+		TeamContainer::CreateTeamServer(packet);
 		break;
 
 	case MessageType::Chat::GET_FRIENDS_LIST:
@@ -250,7 +255,7 @@ void HandlePacket(Packet* packet) {
 		break;
 
 	case MessageType::Chat::TEAM_GET_STATUS:
-		ChatPacketHandler::HandleTeamStatusRequest(packet);
+		TeamContainer::HandleTeamStatusRequest(packet);
 		break;
 
 	case MessageType::Chat::ADD_FRIEND_REQUEST:
@@ -280,27 +285,27 @@ void HandlePacket(Packet* packet) {
 		break;
 
 	case MessageType::Chat::TEAM_INVITE:
-		ChatPacketHandler::HandleTeamInvite(packet);
+		TeamContainer::HandleTeamInvite(packet);
 		break;
 
 	case MessageType::Chat::TEAM_INVITE_RESPONSE:
-		ChatPacketHandler::HandleTeamInviteResponse(packet);
+		TeamContainer::HandleTeamInviteResponse(packet);
 		break;
 
 	case MessageType::Chat::TEAM_LEAVE:
-		ChatPacketHandler::HandleTeamLeave(packet);
+		TeamContainer::HandleTeamLeave(packet);
 		break;
 
 	case MessageType::Chat::TEAM_SET_LEADER:
-		ChatPacketHandler::HandleTeamPromote(packet);
+		TeamContainer::HandleTeamPromote(packet);
 		break;
 
 	case MessageType::Chat::TEAM_KICK:
-		ChatPacketHandler::HandleTeamKick(packet);
+		TeamContainer::HandleTeamKick(packet);
 		break;
 
 	case MessageType::Chat::TEAM_SET_LOOT:
-		ChatPacketHandler::HandleTeamLootOption(packet);
+		TeamContainer::HandleTeamLootOption(packet);
 		break;
 	case MessageType::Chat::GMLEVEL_UPDATE:
 		ChatPacketHandler::HandleGMLevelUpdate(packet);
@@ -321,6 +326,9 @@ void HandlePacket(Packet* packet) {
 		break;
 	case MessageType::Chat::SHOW_ALL:
 		ChatPacketHandler::HandleShowAll(packet);
+		break;
+	case MessageType::Chat::ACHIEVEMENT_NOTIFY:
+		ChatPacketHandler::OnAchievementNotify(inStream, packet->systemAddress);
 		break;
 	case MessageType::Chat::USER_CHANNEL_CHAT_MESSAGE:
 	case MessageType::Chat::WORLD_DISCONNECT_REQUEST:
@@ -357,7 +365,6 @@ void HandlePacket(Packet* packet) {
 	case MessageType::Chat::UGCMANIFEST_REPORT_DONE_BLUEPRINT:
 	case MessageType::Chat::UGCC_REQUEST:
 	case MessageType::Chat::WORLD_PLAYERS_PET_MODERATED_ACKNOWLEDGE:
-	case MessageType::Chat::ACHIEVEMENT_NOTIFY:
 	case MessageType::Chat::GM_CLOSE_PRIVATE_CHAT_WINDOW:
 	case MessageType::Chat::PLAYER_READY:
 	case MessageType::Chat::GET_DONATION_TOTAL:

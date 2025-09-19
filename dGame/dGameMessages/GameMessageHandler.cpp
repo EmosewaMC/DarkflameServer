@@ -32,12 +32,24 @@
 #include "EchoSyncSkill.h"
 #include "eMissionTaskType.h"
 #include "eReplicaComponentType.h"
-#include "eConnectionType.h"
+#include "ServiceType.h"
 #include "MessageType/Game.h"
 #include "ePlayerFlag.h"
 #include "dConfig.h"
 #include "GhostComponent.h"
+#include "eGameMasterLevel.h"
 #include "StringifiedEnum.h"
+
+namespace {
+	using enum MessageType::Game;
+	using namespace GameMessages;
+	using MessageCreator = std::function<std::unique_ptr<GameMessages::GameMsg>()>;
+	std::map<MessageType::Game, MessageCreator> g_MessageHandlers = {
+		{ REQUEST_USE, []() { return std::make_unique<RequestUse>(); }},
+		{ REQUEST_SERVER_OBJECT_INFO, []() { return std::make_unique<RequestServerObjectInfo>(); } },
+		{ SHOOTING_GALLERY_FIRE, []() { return std::make_unique<ShootingGalleryFire>(); } },
+	};
+};
 
 void GameMessageHandler::HandleMessage(RakNet::BitStream& inStream, const SystemAddress& sysAddr, LWOOBJID objectID, MessageType::Game messageID) {
 
@@ -54,6 +66,24 @@ void GameMessageHandler::HandleMessage(RakNet::BitStream& inStream, const System
 	}
 
 	if (messageID != MessageType::Game::READY_FOR_UPDATES) LOG_DEBUG("Received GM with ID and name: %4i, %s", messageID, StringifiedEnum::ToString(messageID).data());
+
+	auto handler = g_MessageHandlers.find(messageID);
+	if (handler != g_MessageHandlers.end()) {
+		auto msg = handler->second();
+
+		// Verify that the system address user is able to use this message.
+		if (msg->requiredGmLevel > eGameMasterLevel::CIVILIAN) {
+			auto* usingEntity = Game::entityManager->GetEntity(usr->GetLoggedInChar());
+			if (!usingEntity || usingEntity->GetGMLevel() < msg->requiredGmLevel) {
+				LOG("User %s (%llu) does not have the required GM level to execute this command.", usingEntity->GetCharacter()->GetName().c_str(), usingEntity->GetObjectID());
+				return;
+			}
+		}
+
+		msg->Deserialize(inStream);
+		msg->Handle(*entity, sysAddr);
+		return;
+	}
 
 	switch (messageID) {
 
@@ -89,11 +119,6 @@ void GameMessageHandler::HandleMessage(RakNet::BitStream& inStream, const System
 		break;
 	}
 
-	case MessageType::Game::REQUEST_USE: {
-		GameMessages::HandleRequestUse(inStream, entity, sysAddr);
-		break;
-	}
-
 	case MessageType::Game::SET_FLAG: {
 		GameMessages::HandleSetFlag(inStream, entity);
 		break;
@@ -104,13 +129,13 @@ void GameMessageHandler::HandleMessage(RakNet::BitStream& inStream, const System
 		break;
 	}
 
-	// Currently not actually used for our implementation, however its used right now to get around invisible inventory items in the client.
+											  // Currently not actually used for our implementation, however its used right now to get around invisible inventory items in the client.
 	case MessageType::Game::SELECT_SKILL: {
 		auto var = entity->GetVar<bool>(u"dlu_first_time_load");
 		if (var) {
 			entity->SetVar<bool>(u"dlu_first_time_load", false);
 			InventoryComponent* inventoryComponent = entity->GetComponent<InventoryComponent>();
-			
+
 			if (inventoryComponent) inventoryComponent->FixInvisibleItems();
 		}
 		break;
@@ -133,6 +158,10 @@ void GameMessageHandler::HandleMessage(RakNet::BitStream& inStream, const System
 
 				inv->AddItemSkills(item.lot);
 			}
+
+			// Fixes a bug where testmapping too fast causes large item inventories to become invisible.
+			// Only affects item inventory
+			GameMessages::SendSetInventorySize(entity, eInventoryType::ITEMS, inv->GetInventory(eInventoryType::ITEMS)->GetSize());
 		}
 
 		GameMessages::SendRestoreToPostLoadStats(entity, sysAddr);
@@ -324,7 +353,7 @@ void GameMessageHandler::HandleMessage(RakNet::BitStream& inStream, const System
 		if (success) {
 			//Broadcast our startSkill:
 			RakNet::BitStream bitStreamLocal;
-			BitStreamUtils::WriteHeader(bitStreamLocal, eConnectionType::CLIENT, MessageType::Client::GAME_MSG);
+			BitStreamUtils::WriteHeader(bitStreamLocal, ServiceType::CLIENT, MessageType::Client::GAME_MSG);
 			bitStreamLocal.Write(entity->GetObjectID());
 
 			EchoStartSkill echoStartSkill;
@@ -346,7 +375,7 @@ void GameMessageHandler::HandleMessage(RakNet::BitStream& inStream, const System
 
 	case MessageType::Game::SYNC_SKILL: {
 		RakNet::BitStream bitStreamLocal;
-		BitStreamUtils::WriteHeader(bitStreamLocal, eConnectionType::CLIENT, MessageType::Client::GAME_MSG);
+		BitStreamUtils::WriteHeader(bitStreamLocal, ServiceType::CLIENT, MessageType::Client::GAME_MSG);
 		bitStreamLocal.Write(entity->GetObjectID());
 
 		SyncSkill sync = SyncSkill(inStream); // inStream replaced &bitStream
@@ -704,12 +733,6 @@ void GameMessageHandler::HandleMessage(RakNet::BitStream& inStream, const System
 	case MessageType::Game::UPDATE_INVENTORY_GROUP_CONTENTS:
 		GameMessages::HandleUpdateInventoryGroupContents(inStream, entity, sysAddr);
 		break;
-	case MessageType::Game::SHOOTING_GALLERY_FIRE: {
-		GameMessages::ShootingGalleryFire fire{};
-		fire.Deserialize(inStream);
-		fire.Handle(*entity, sysAddr);
-		break;
-	}
 
 	default:
 		LOG_DEBUG("Received Unknown GM with ID: %4i, %s", messageID, StringifiedEnum::ToString(messageID).data());

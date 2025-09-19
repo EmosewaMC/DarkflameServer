@@ -9,6 +9,10 @@
 
 #include "CDActivitiesTable.h"
 
+namespace GameMessages {
+	class GameMsg;
+};
+
  /**
   * Represents an instance of an activity, having participants and score
   */
@@ -60,6 +64,10 @@ public:
 	 * Currently unused
 	 */
 	void SetScore(uint32_t score);
+
+	[[nodiscard]] uint32_t GetNextZoneCloneID() const noexcept { return m_NextZoneCloneID; }
+
+	const CDActivities& GetActivityInfo() const noexcept { return m_ActivityInfo; }
 private:
 
 	/**
@@ -75,12 +83,12 @@ private:
 	/**
 	 * The database information for this activity
 	 */
-	CDActivities m_ActivityInfo;
+	CDActivities m_ActivityInfo{};
 
 	/**
 	 * The entity that owns this activity (the entity that has the ScriptedActivityComponent)
 	 */
-	Entity* m_Parent;
+	Entity* m_Parent{};
 
 	/**
 	 * All the participants of this activity
@@ -234,10 +242,17 @@ public:
 	 */
 	bool IsPlayedBy(LWOOBJID playerID) const;
 
+	/** 
+	 * Checks if the entity has enough cost to play this activity
+	 * @param player the entity to check
+	 * @return true if the entity has enough cost to play this activity, false otherwise
+	*/
+	bool CheckCost(Entity* player) const;
+
 	/**
 	 * Removes the cost of the activity (e.g. green imaginate) for the entity that plays this activity
 	 * @param player the entity to take cost for
-	 * @return true if the cost was successfully deducted, false otherwise
+	 * @return true if the cost was taken, false otherwise
 	 */
 	bool TakeCost(Entity* player) const;
 
@@ -334,6 +349,7 @@ public:
 	uint32_t GetLootMatrixForTeamSize(uint32_t teamSize) { return m_ActivityLootMatrices[teamSize]; }
 private:
 
+	bool OnGetObjectReportInfo(GameMessages::GameMsg& msg);
 	/**
 	 * The database information for this activity
 	 */

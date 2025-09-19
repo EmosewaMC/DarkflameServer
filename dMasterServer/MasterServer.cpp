@@ -23,7 +23,7 @@
 #include "dServer.h"
 #include "AssetManager.h"
 #include "BinaryPathFinder.h"
-#include "eConnectionType.h"
+#include "ServiceType.h"
 #include "MessageType/Master.h"
 
 //RakNet includes:
@@ -42,6 +42,14 @@
 #include "Server.h"
 #include "CDZoneTableTable.h"
 #include "eGameMasterLevel.h"
+#include "StringifiedEnum.h"
+
+#ifdef DARKFLAME_PLATFORM_UNIX
+
+#include <sys/types.h>
+#include <sys/wait.h>
+
+#endif
 
 namespace Game {
 	Logger* logger = nullptr;
@@ -151,6 +159,7 @@ int main(int argc, char** argv) {
 	}
 
 	MigrationRunner::RunMigrations();
+	Database::Get()->Commit();
 	const auto resServerPath = BinaryPathFinder::GetBinaryDir() / "resServer";
 	std::filesystem::create_directories(resServerPath);
 	const bool cdServerExists = std::filesystem::exists(resServerPath / "CDServer.sqlite");
@@ -205,6 +214,13 @@ int main(int argc, char** argv) {
 	// Run migrations should any need to be run.
 	MigrationRunner::RunSQLiteMigrations();
 
+	// Check for the --migrations-only flag
+	if ((argc > 1 &&
+		(strcmp(argv[1], "--migrations-only") == 0 || strcmp(argv[1], "-m") == 0))) {
+		LOG("Migrations only flag detected.  Exiting.");
+		return EXIT_SUCCESS;
+	}
+
 	//If the first command line argument is -a or --account then make the user
 	//input a username and password, with the password being hidden.
 	bool createAccount = Database::Get()->GetAccountCount() == 0 && Game::config->GetValue("skip_account_creation") != "1";
@@ -246,7 +262,8 @@ int main(int argc, char** argv) {
 				// Regenerate hash based on new password
 				char salt[BCRYPT_HASHSIZE];
 				char hash[BCRYPT_HASHSIZE];
-				assert(GenerateBCryptPassword(password, 12, salt, hash) == 0);
+				int res = GenerateBCryptPassword(password, 12, salt, hash);
+				assert(res == 0);
 
 				Database::Get()->UpdateAccountPassword(accountId->id, std::string(hash, BCRYPT_HASHSIZE));
 
@@ -284,7 +301,8 @@ int main(int argc, char** argv) {
 		//Generate new hash for bcrypt
 		char salt[BCRYPT_HASHSIZE];
 		char hash[BCRYPT_HASHSIZE];
-		assert(GenerateBCryptPassword(password, 12, salt, hash) == 0);
+		int res = GenerateBCryptPassword(password, 12, salt, hash);
+		assert(res == 0);
 
 		//Create account
 		try {
@@ -323,9 +341,10 @@ int main(int argc, char** argv) {
 	char salt[BCRYPT_HASHSIZE];
 	char hash[BCRYPT_HASHSIZE];
 	const auto& cfgPassword = Game::config->GetValue("master_password");
-	GenerateBCryptPassword(!cfgPassword.empty() ? cfgPassword : "3.25DARKFLAME1", 13, salt, hash);
+	int res = GenerateBCryptPassword(!cfgPassword.empty() ? cfgPassword : "3.25DARKFLAME1", 13, salt, hash);
+	assert(res == 0);
 
-	Game::server = new dServer(ourIP, ourPort, 0, maxClients, true, false, Game::logger, "", 0, ServerType::Master, Game::config, &Game::lastSignal, hash);
+	Game::server = new dServer(ourIP, ourPort, 0, maxClients, true, false, Game::logger, "", 0, ServiceType::MASTER, Game::config, &Game::lastSignal, hash);
 
 	std::string master_server_ip = "localhost";
 	const auto masterServerIPString = Game::config->GetValue("master_ip");
@@ -341,7 +360,7 @@ int main(int argc, char** argv) {
 
 	//Create additional objects here:
 	PersistentIDManager::Initialize();
-	Game::im = new InstanceManager(Game::logger, Game::server->GetIP());
+	Game::im = new InstanceManager(Game::server->GetIP());
 
 	//Get CDClient initial information
 	try {
@@ -416,9 +435,9 @@ int main(int argc, char** argv) {
 				framesSinceKillUniverseCommand++;
 		}
 
-		const auto instances = Game::im->GetInstances();
+		const auto& instances = Game::im->GetInstances();
 
-		for (auto* instance : instances) {
+		for (const auto& instance : instances) {
 			if (instance == nullptr) {
 				break;
 			}
@@ -442,7 +461,7 @@ int main(int argc, char** argv) {
 		}
 
 		//Remove dead instances
-		for (auto* instance : instances) {
+		for (const auto& instance : instances) {
 			if (instance == nullptr) {
 				break;
 			}
@@ -451,6 +470,12 @@ int main(int argc, char** argv) {
 				Game::im->RemoveInstance(instance);
 			}
 		}
+
+#ifdef DARKFLAME_PLATFORM_UNIX
+		// kill off dead zombie instances
+		int status{};
+		waitpid(static_cast<pid_t>(-1), &status, WNOHANG);
+#endif
 
 		t += std::chrono::milliseconds(masterFrameDelta);
 		std::this_thread::sleep_until(t);
@@ -465,7 +490,7 @@ void HandlePacket(Packet* packet) {
 
 		//Since this disconnection is intentional, we'll just delete it as
 		//we'll start a new one anyway if needed:
-		Instance* instance =
+		const auto& instance =
 			Game::im->GetInstanceBySysAddr(packet->systemAddress);
 		if (instance) {
 			LOG("Actually disconnected from zone %i clone %i instance %i port %i", instance->GetMapID(), instance->GetCloneID(), instance->GetInstanceID(), instance->GetPort());
@@ -486,7 +511,7 @@ void HandlePacket(Packet* packet) {
 	if (packet->data[0] == ID_CONNECTION_LOST) {
 		LOG("A server has lost the connection");
 
-		Instance* instance =
+		const auto& instance =
 			Game::im->GetInstanceBySysAddr(packet->systemAddress);
 		if (instance) {
 			LWOZONEID zoneID = instance->GetZoneID(); //Get the zoneID so we can recreate a server
@@ -506,7 +531,7 @@ void HandlePacket(Packet* packet) {
 
 	if (packet->length < 4) return;
 
-	if (static_cast<eConnectionType>(packet->data[1]) == eConnectionType::MASTER) {
+	if (static_cast<ServiceType>(packet->data[1]) == ServiceType::MASTER) {
 		switch (static_cast<MessageType::Master>(packet->data[3])) {
 		case MessageType::Master::REQUEST_PERSISTENT_ID: {
 			LOG("A persistent ID req");
@@ -537,10 +562,10 @@ void HandlePacket(Packet* packet) {
 				LOG("Shutdown sequence has been started.  Not creating a new zone.");
 				break;
 			}
-			Instance* in = Game::im->GetInstance(zoneID, false, zoneClone);
+			const auto& in = Game::im->GetInstance(zoneID, false, zoneClone);
 
-			for (auto* instance : Game::im->GetInstances()) {
-				LOG("Instance: %i/%i/%i -> %i", instance->GetMapID(), instance->GetCloneID(), instance->GetInstanceID(), instance == in);
+			for (const auto& instance : Game::im->GetInstances()) {
+				LOG("Instance: %i/%i/%i -> %i %s", instance->GetMapID(), instance->GetCloneID(), instance->GetInstanceID(), instance == in, instance->GetSysAddr().ToString());
 			}
 
 			if (in && !in->GetIsReady()) //Instance not ready, make a pending request
@@ -568,7 +593,7 @@ void HandlePacket(Packet* packet) {
 			uint32_t theirPort = 0;
 			uint32_t theirZoneID = 0;
 			uint32_t theirInstanceID = 0;
-			ServerType theirServerType;
+			ServiceType theirServerType;
 			LUString theirIP;
 
 			inStream.Read(theirPort);
@@ -577,42 +602,31 @@ void HandlePacket(Packet* packet) {
 			inStream.Read(theirServerType);
 			inStream.Read(theirIP);
 
-			if (theirServerType == ServerType::World) {
+			switch (theirServerType) {
+			case ServiceType::WORLD:
 				if (!Game::im->IsPortInUse(theirPort)) {
-					Instance* in = new Instance(theirIP.string, theirPort, theirZoneID, theirInstanceID, 0, 12, 12);
-
-					SystemAddress copy;
-					copy.binaryAddress = packet->systemAddress.binaryAddress;
-					copy.port = packet->systemAddress.port;
-
-					in->SetSysAddr(copy);
+					auto in = std::make_unique<Instance>(theirIP.string, theirPort, theirZoneID, theirInstanceID, 0, 12, 12);
+					in->SetSysAddr(packet->systemAddress);
 					Game::im->AddInstance(in);
 				} else {
-					auto instance = Game::im->FindInstance(
-						theirZoneID, static_cast<uint16_t>(theirInstanceID));
+					const auto& instance = Game::im->FindInstanceWithPrivate(theirZoneID, static_cast<LWOINSTANCEID>(theirInstanceID));
 					if (instance) {
 						instance->SetSysAddr(packet->systemAddress);
 					}
 				}
+                break;
+			case ServiceType::CHAT:
+				chatServerMasterPeerSysAddr = packet->systemAddress;
+				break;
+            case ServiceType::AUTH:
+                authServerMasterPeerSysAddr = packet->systemAddress;
+                break;
+			default:
+				// We just ignore any other server type
+				break;
 			}
 
-			if (theirServerType == ServerType::Chat) {
-				SystemAddress copy;
-				copy.binaryAddress = packet->systemAddress.binaryAddress;
-				copy.port = packet->systemAddress.port;
-
-				chatServerMasterPeerSysAddr = copy;
-			}
-
-			if (theirServerType == ServerType::Auth) {
-				SystemAddress copy;
-				copy.binaryAddress = packet->systemAddress.binaryAddress;
-				copy.port = packet->systemAddress.port;
-
-				authServerMasterPeerSysAddr = copy;
-			}
-
-			LOG("Received server info, instance: %i port: %i", theirInstanceID, theirPort);
+			LOG("Received %s server info, instance: %i port: %i", StringifiedEnum::ToString(theirServerType).data(), theirInstanceID, theirPort);
 
 			break;
 		}
@@ -629,7 +643,7 @@ void HandlePacket(Packet* packet) {
 					activeSessions.erase(it.first);
 
 					CBITSTREAM;
-					BitStreamUtils::WriteHeader(bitStream, eConnectionType::MASTER, MessageType::Master::NEW_SESSION_ALERT);
+					BitStreamUtils::WriteHeader(bitStream, ServiceType::MASTER, MessageType::Master::NEW_SESSION_ALERT);
 					bitStream.Write(sessionKey);
 					bitStream.Write(username);
 					SEND_PACKET_BROADCAST;
@@ -651,7 +665,7 @@ void HandlePacket(Packet* packet) {
 			for (auto key : activeSessions) {
 				if (key.second == username.GetAsString()) {
 					CBITSTREAM;
-					BitStreamUtils::WriteHeader(bitStream, eConnectionType::MASTER, MessageType::Master::SESSION_KEY_RESPONSE);
+					BitStreamUtils::WriteHeader(bitStream, ServiceType::MASTER, MessageType::Master::SESSION_KEY_RESPONSE);
 					bitStream.Write(key.first);
 					bitStream.Write(username);
 					Game::server->Send(bitStream, packet->systemAddress, false);
@@ -671,12 +685,12 @@ void HandlePacket(Packet* packet) {
 			inStream.Read(theirZoneID);
 			inStream.Read(theirInstanceID);
 
-			auto instance =
+			const auto& instance =
 				Game::im->FindInstance(theirZoneID, theirInstanceID);
 			if (instance) {
 				instance->AddPlayer(Player());
 			} else {
-				printf("Instance missing? What?");
+				LOG("Instance missing? What?");
 			}
 			break;
 		}
@@ -691,7 +705,7 @@ void HandlePacket(Packet* packet) {
 			inStream.Read(theirZoneID);
 			inStream.Read(theirInstanceID);
 
-			auto instance =
+			const auto& instance =
 				Game::im->FindInstance(theirZoneID, theirInstanceID);
 			if (instance) {
 				instance->RemovePlayer(Player());
@@ -717,8 +731,8 @@ void HandlePacket(Packet* packet) {
 				inStream.Read<char>(character);
 				password += character;
 			}
-
-			Game::im->CreatePrivateInstance(mapId, cloneId, password.c_str());
+			const auto& newInst = Game::im->CreatePrivateInstance(mapId, cloneId, password.c_str());
+			LOG("Creating private zone %i/%i/%i with password %s", newInst->GetMapID(), newInst->GetCloneID(), newInst->GetInstanceID(), password.c_str());
 
 			break;
 		}
@@ -743,9 +757,9 @@ void HandlePacket(Packet* packet) {
 				password += character;
 			}
 
-			auto* instance = Game::im->FindPrivateInstance(password.c_str());
+			const auto& instance = Game::im->FindPrivateInstance(password.c_str());
 
-			LOG("Join private zone: %llu %d %s %p", requestID, mythranShift, password.c_str(), instance);
+			LOG("Join private zone: %llu %d %s %p", requestID, mythranShift, password.c_str(), instance.get());
 
 			if (instance == nullptr) {
 				return;
@@ -770,7 +784,7 @@ void HandlePacket(Packet* packet) {
 
 			LOG("Got world ready %i %i", zoneID, instanceID);
 
-			auto* instance = Game::im->FindInstance(zoneID, instanceID);
+			const auto& instance = Game::im->FindInstance(zoneID, instanceID);
 
 			if (instance == nullptr) {
 				LOG("Failed to find zone to ready");
@@ -808,7 +822,7 @@ void HandlePacket(Packet* packet) {
 
 			LOG("Got affirmation of transfer %llu", requestID);
 
-			auto* instance = Game::im->GetInstanceBySysAddr(packet->systemAddress);
+			const auto& instance = Game::im->GetInstanceBySysAddr(packet->systemAddress);
 
 			if (instance == nullptr)
 				return;
@@ -819,11 +833,10 @@ void HandlePacket(Packet* packet) {
 		}
 
 		case MessageType::Master::SHUTDOWN_RESPONSE: {
-			RakNet::BitStream inStream(packet->data, packet->length, false);
-			uint64_t header = inStream.Read(header);
+			CINSTREAM_SKIP_HEADER;
 
-			auto* instance = Game::im->GetInstanceBySysAddr(packet->systemAddress);
-
+			const auto& instance = Game::im->GetInstanceBySysAddr(packet->systemAddress);
+			LOG("Got shutdown response from %s", packet->systemAddress.ToString());
 			if (instance == nullptr) {
 				return;
 			}
@@ -863,7 +876,7 @@ int ShutdownSequence(int32_t signal) {
 
 	{
 		CBITSTREAM;
-		BitStreamUtils::WriteHeader(bitStream, eConnectionType::MASTER, MessageType::Master::SHUTDOWN);
+		BitStreamUtils::WriteHeader(bitStream, ServiceType::MASTER, MessageType::Master::SHUTDOWN);
 		Game::server->Send(bitStream, UNASSIGNED_SYSTEM_ADDRESS, true);
 		LOG("Triggered master shutdown");
 	}
@@ -872,13 +885,13 @@ int ShutdownSequence(int32_t signal) {
 	LOG("Saved ObjectIDTracker to DB");
 
 	// A server might not be finished spinning up yet, remove all of those here.
-	for (auto* instance : Game::im->GetInstances()) {
+	for (const auto& instance : Game::im->GetInstances()) {
+		if (!instance) continue;
+
 		if (!instance->GetIsReady()) {
 			Game::im->RemoveInstance(instance);
 		}
-	}
-
-	for (auto* instance : Game::im->GetInstances()) {
+		
 		instance->SetIsShuttingDown(true);
 	}
 
@@ -899,7 +912,7 @@ int ShutdownSequence(int32_t signal) {
 
 		allInstancesShutdown = true;
 
-		for (auto* instance : Game::im->GetInstances()) {
+		for (const auto& instance : Game::im->GetInstances()) {
 			if (instance == nullptr) {
 				continue;
 			}

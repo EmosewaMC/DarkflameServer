@@ -78,7 +78,7 @@ git clone --recursive https://github.com/DarkflameUniverse/DarkflameServer
 
 ### Windows packages
 Ensure that you have either the [MSVC C++ compiler](https://visualstudio.microsoft.com/vs/features/cplusplus/) (recommended) or the [Clang compiler](https://github.com/llvm/llvm-project/releases/) installed.
-You'll also need to download and install [CMake](https://cmake.org/download/) (version <font size="4">**CMake version 3.25**</font> or later!).
+You'll also need to download and install [CMake](https://cmake.org/download/) (<font size="4">**version 3.25**</font> up to <font size="4">**version 3.31**</font>!).
 
 ### MacOS packages
 Ensure you have [brew](https://brew.sh) installed.
@@ -100,7 +100,7 @@ sudo apt install build-essential gcc zlib1g-dev libssl-dev openssl mariadb-serve
 ```
 
 #### Required CMake version
-This project uses <font size="4">**CMake version 3.25**</font> or higher and as such you will need to ensure you have this version installed.
+This project uses <font size="4">**CMake version 3.25**</font> up to <font size="4">**version 3.31**</font> and as such you will need to ensure you have this version installed.
 You can check your CMake version by using the following command in a terminal.
 ```bash
 cmake --version
@@ -187,7 +187,8 @@ Now that you are logged in, run the following commands.
 ```bash
 # Creates a user for this computer which uses a password and grant said user all privileges.
 # Change mydarkflameuser to a custom username and password to a custom password. 
-GRANT ALL ON *.* TO 'mydarkflameuser'@'localhost' IDENTIFIED BY 'password' WITH GRANT OPTION;
+CREATE USER 'mydarkflameuser'@'localhost' IDENTIFIED BY 'password';
+GRANT ALL ON *.* TO 'mydarkflameuser'@'localhost' WITH GRANT OPTION;
 FLUSH PRIVILEGES;
 
 # Then create a database for Darkflame Universe to use.
@@ -324,13 +325,15 @@ While a character has a gmlevel of anything but `0`, some gameplay behavior will
 Some changes to the client `boot.cfg` file are needed to play on your server.
 
 ## Allowing a user to connect to your server
+**ALL OF THESE CHANGES ARE REQUIRED. PLEASE FULLY READ THIS SECTION**
+
 To connect to a server follow these steps:
 * In the client directory, locate `boot.cfg`
-* Open it in a text editor and locate where it says `AUTHSERVERIP=0:`
-* Replace the contents after to `:` and the following `,` with what you configured as the server's public facing IP. For example `AUTHSERVERIP=0:localhost` for locally hosted servers
-* Next locate the line `UGCUSE3DSERVICES=7:`
+* Open `boot.cfg` in a text editor and locate the line `UGCUSE3DSERVICES=7:`
 * Ensure the number after the 7 is a `0`
 * Alternatively, remove the line with `UGCUSE3DSERVICES` altogether
+* Next locate where it says `AUTHSERVERIP=0:`
+* Replace the contents after to `:` and the following `,` with what you configured as the server's public facing IP. For example `AUTHSERVERIP=0:localhost` for locally hosted servers
 * Launch `legouniverse.exe`, through `wine` if on a Unix-like operating system
 * Note that if you are on WSL2, you will need to configure the public IP in the server and client to be the IP of the WSL2 instance and not localhost, which can be found by running `ifconfig` in the terminal. Windows defaults to WSL1, so this will not apply to most users.
 As an example, here is what the boot.cfg is required to contain for a server with the ip 12.34.56.78

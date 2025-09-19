@@ -209,6 +209,8 @@ public:
 	 */
 	static float GetBaseSpeed(LOT lot);
 
+	bool IsPaused() const { return m_Paused; }
+
 private:
 
 	/**
@@ -321,6 +323,11 @@ private:
 	bool m_Paused;
 
 	NiPoint3 m_SavedVelocity;
+
+	bool m_IsBounced{};
+
+	// The number of waypoints that were on the path in the call to SetPath
+	uint32_t m_CurrentPathWaypointCount{ 0 };
 };
 
 #endif // MOVEMENTAICOMPONENT_H

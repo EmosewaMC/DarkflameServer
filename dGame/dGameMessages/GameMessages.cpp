@@ -40,7 +40,7 @@
 #include "eQuickBuildFailReason.h"
 #include "eControlScheme.h"
 #include "eStateChangeType.h"
-#include "eConnectionType.h"
+#include "ServiceType.h"
 #include "ePlayerFlag.h"
 
 #include <sstream>
@@ -102,6 +102,8 @@
 #include "CDComponentsRegistryTable.h"
 #include "CDObjectsTable.h"
 #include "eItemType.h"
+#include "Lxfml.h"
+#include "Sd0.h"
 
 void GameMessages::SendFireEventClientSide(const LWOOBJID& objectID, const SystemAddress& sysAddr, std::u16string args, const LWOOBJID& object, int64_t param1, int param2, const LWOOBJID& sender) {
 	CBITSTREAM;
@@ -387,7 +389,7 @@ void GameMessages::SendPlatformResync(Entity* entity, const SystemAddress& sysAd
 	float fMoveTimeElapsed = 0.0f;
 	float fPercentBetweenPoints = 0.0f;
 	NiPoint3 ptUnexpectedLocation = NiPoint3Constant::ZERO;
-	NiQuaternion qUnexpectedRotation = NiQuaternionConstant::IDENTITY;
+	NiQuaternion qUnexpectedRotation = QuatUtils::IDENTITY;
 
 	bitStream.Write(bReverse);
 	bitStream.Write(bStopAtDesiredWaypoint);
@@ -404,8 +406,8 @@ void GameMessages::SendPlatformResync(Entity* entity, const SystemAddress& sysAd
 	bitStream.Write(ptUnexpectedLocation.y);
 	bitStream.Write(ptUnexpectedLocation.z);
 
-	bitStream.Write(qUnexpectedRotation != NiQuaternionConstant::IDENTITY);
-	if (qUnexpectedRotation != NiQuaternionConstant::IDENTITY) {
+	bitStream.Write(qUnexpectedRotation != QuatUtils::IDENTITY);
+	if (qUnexpectedRotation != QuatUtils::IDENTITY) {
 		bitStream.Write(qUnexpectedRotation.x);
 		bitStream.Write(qUnexpectedRotation.y);
 		bitStream.Write(qUnexpectedRotation.z);
@@ -1179,7 +1181,7 @@ void GameMessages::SendPlayerReachedRespawnCheckpoint(Entity* entity, const NiPo
 	bitStream.Write(position.y);
 	bitStream.Write(position.z);
 
-	const bool bIsNotIdentity = rotation != NiQuaternionConstant::IDENTITY;
+	const bool bIsNotIdentity = rotation != QuatUtils::IDENTITY;
 	bitStream.Write(bIsNotIdentity);
 
 	if (bIsNotIdentity) {
@@ -1696,7 +1698,8 @@ void GameMessages::HandleRequestActivitySummaryLeaderboardData(RakNet::BitStream
 
 	bool weekly = inStream.ReadBit();
 
-	LeaderboardManager::SendLeaderboard(gameID, queryType, weekly, entity->GetObjectID(), entity->GetObjectID());
+	// The client won't accept more than 10 results even if we wanted it to
+	LeaderboardManager::SendLeaderboard(gameID, queryType, weekly, entity->GetObjectID(), entity->GetObjectID(), 10);
 }
 
 void GameMessages::HandleActivityStateChangeRequest(RakNet::BitStream& inStream, Entity* entity) {
@@ -2126,8 +2129,8 @@ void GameMessages::SendPlaceModelResponse(LWOOBJID objectId, const SystemAddress
 		bitStream.Write(response);
 	}
 
-	bitStream.Write(rotation != NiQuaternionConstant::IDENTITY);
-	if (rotation != NiQuaternionConstant::IDENTITY) {
+	bitStream.Write(rotation != QuatUtils::IDENTITY);
+	if (rotation != QuatUtils::IDENTITY) {
 		bitStream.Write(response);
 	}
 
@@ -2205,7 +2208,7 @@ void GameMessages::HandleUnUseModel(RakNet::BitStream& inStream, Entity* entity,
 
 	if (unknown) {
 		CBITSTREAM;
-		BitStreamUtils::WriteHeader(bitStream, eConnectionType::CLIENT, MessageType::Client::BLUEPRINT_SAVE_RESPONSE);
+		BitStreamUtils::WriteHeader(bitStream, ServiceType::CLIENT, MessageType::Client::BLUEPRINT_SAVE_RESPONSE);
 		bitStream.Write<LWOOBJID>(LWOOBJID_EMPTY); //always zero so that a check on the client passes
 		bitStream.Write(eBlueprintSaveResponseType::PlacementFailed); // Sending a non-zero error code here prevents the client from deleting its in progress build for some reason?
 		bitStream.Write<uint32_t>(0);
@@ -2392,13 +2395,13 @@ void GameMessages::HandlePlacePropertyModel(RakNet::BitStream& inStream, Entity*
 
 	inStream.Read(model);
 
-	PropertyManagementComponent::Instance()->UpdateModelPosition(model, NiPoint3Constant::ZERO, NiQuaternionConstant::IDENTITY);
+	PropertyManagementComponent::Instance()->UpdateModelPosition(model, NiPoint3Constant::ZERO, QuatUtils::IDENTITY);
 }
 
 void GameMessages::HandleUpdatePropertyModel(RakNet::BitStream& inStream, Entity* entity, const SystemAddress& sysAddr) {
 	LWOOBJID model;
 	NiPoint3 position;
-	NiQuaternion rotation = NiQuaternionConstant::IDENTITY;
+	NiQuaternion rotation = QuatUtils::IDENTITY;
 
 	inStream.Read(model);
 	inStream.Read(position);
@@ -2457,7 +2460,7 @@ void GameMessages::HandleBBBLoadItemRequest(RakNet::BitStream& inStream, Entity*
 
 void GameMessages::SendBlueprintLoadItemResponse(const SystemAddress& sysAddr, bool success, LWOOBJID oldItemId, LWOOBJID newItemId) {
 	CBITSTREAM;
-	BitStreamUtils::WriteHeader(bitStream, eConnectionType::CLIENT, MessageType::Client::BLUEPRINT_LOAD_RESPONSE_ITEMID);
+	BitStreamUtils::WriteHeader(bitStream, ServiceType::CLIENT, MessageType::Client::BLUEPRINT_LOAD_RESPONSE_ITEMID);
 	bitStream.Write<uint8_t>(success);
 	bitStream.Write<LWOOBJID>(oldItemId);
 	bitStream.Write<LWOOBJID>(newItemId);
@@ -2574,18 +2577,6 @@ void GameMessages::HandleBBBSaveRequest(RakNet::BitStream& inStream, Entity* ent
 		TODO Apparently the bricks are supposed to be taken via MoveInventoryBatch?
 	*/
 
-	////Decompress the SD0 from the client so we can process the lxfml properly
-	//uint8_t* outData = new uint8_t[327680];
-	//int32_t error;
-	//int32_t size = ZCompression::Decompress(inData, lxfmlSize, outData, 327680, error);
-
-	//if (size == -1) {
-	//	LOG("Failed to decompress LXFML: (%i)", error);
-	//	return;
-	//}
-	//
-	//std::string lxfml(reinterpret_cast<char*>(outData), size); //std::string version of the decompressed data!
-
 	//Now, the cave of dragons:
 
 	//We runs this in async because the http library here is blocking, meaning it'll halt the thread.
@@ -2613,16 +2604,25 @@ void GameMessages::HandleBBBSaveRequest(RakNet::BitStream& inStream, Entity* ent
 		LWOOBJID propertyId = LWOOBJID_EMPTY;
 		if (propertyInfo) propertyId = propertyInfo->id;
 
-		//Insert into ugc:
+		// Save the binary data to the Sd0 buffer
 		std::string str(sd0Data.get(), sd0Size);
 		std::istringstream sd0DataStream(str);
-		Database::Get()->InsertNewUgcModel(sd0DataStream, blueprintIDSmall, entity->GetCharacter()->GetParentUser()->GetAccountID(), entity->GetCharacter()->GetID());
+		Sd0 sd0(sd0DataStream);
+
+		// Uncompress the data and normalize the position
+		const auto asStr = sd0.GetAsStringUncompressed();
+		const auto [newLxfml, newCenter] = Lxfml::NormalizePosition(asStr);
+
+		// Recompress the data and save to the database
+		sd0.FromData(reinterpret_cast<const uint8_t*>(newLxfml.data()), newLxfml.size());
+		auto sd0AsStream = sd0.GetAsStream();
+		Database::Get()->InsertNewUgcModel(sd0AsStream, blueprintIDSmall, entity->GetCharacter()->GetParentUser()->GetAccountID(), entity->GetCharacter()->GetID());
 
 		//Insert into the db as a BBB model:
 		IPropertyContents::Model model;
 		model.id = newIDL;
 		model.ugcId = blueprintIDSmall;
-		model.position = NiPoint3Constant::ZERO;
+		model.position = newCenter;
 		model.rotation = NiQuaternion(0.0f, 0.0f, 0.0f, 0.0f);
 		model.lot = 14;
 		Database::Get()->InsertNewPropertyModel(propertyId, model, "Objects_14_name");
@@ -2648,16 +2648,19 @@ void GameMessages::HandleBBBSaveRequest(RakNet::BitStream& inStream, Entity* ent
 		//}
 
 		//Tell the client their model is saved: (this causes us to actually pop out of our current state):
+		const auto& newSd0 = sd0.GetAsVector();
+		uint32_t sd0Size{};
+		for (const auto& chunk : newSd0) sd0Size += chunk.size();
 		CBITSTREAM;
-		BitStreamUtils::WriteHeader(bitStream, eConnectionType::CLIENT, MessageType::Client::BLUEPRINT_SAVE_RESPONSE);
+		BitStreamUtils::WriteHeader(bitStream, ServiceType::CLIENT, MessageType::Client::BLUEPRINT_SAVE_RESPONSE);
 		bitStream.Write(localId);
 		bitStream.Write(eBlueprintSaveResponseType::EverythingWorked);
 		bitStream.Write<uint32_t>(1);
 		bitStream.Write(blueprintID);
 
-		bitStream.Write<uint32_t>(sd0Size);
+		bitStream.Write(sd0Size);
 
-		bitStream.WriteAlignedBytes(reinterpret_cast<unsigned char*>(sd0Data.get()), sd0Size);
+		for (const auto& chunk : newSd0) bitStream.WriteAlignedBytes(reinterpret_cast<const unsigned char*>(chunk.data()), chunk.size());
 
 		SEND_PACKET;
 
@@ -2665,7 +2668,7 @@ void GameMessages::HandleBBBSaveRequest(RakNet::BitStream& inStream, Entity* ent
 
 		EntityInfo info;
 		info.lot = 14;
-		info.pos = {};
+		info.pos = newCenter;
 		info.rot = {};
 		info.spawner = nullptr;
 		info.spawnerID = entity->GetObjectID();
@@ -3397,7 +3400,7 @@ void GameMessages::SendNotifyPetTamingMinigame(LWOOBJID objectId, LWOOBJID petId
 	bitStream.Write(petsDestPos);
 	bitStream.Write(telePos);
 
-	const bool hasDefault = teleRot != NiQuaternionConstant::IDENTITY;
+	const bool hasDefault = teleRot != QuatUtils::IDENTITY;
 	bitStream.Write(hasDefault);
 	if (hasDefault) bitStream.Write(teleRot);
 
@@ -4820,11 +4823,10 @@ void GameMessages::HandleBuybackFromVendor(RakNet::BitStream& inStream, Entity* 
 
 	if (Inventory::IsValidItem(itemComp.currencyLOT)) {
 		const uint32_t altCurrencyCost = std::floor(itemComp.altCurrencyCost * sellScalar) * count;
-		if (inv->GetLotCount(itemComp.currencyLOT) < altCurrencyCost) {
+		if (inv->GetLotCount(itemComp.currencyLOT) < altCurrencyCost || !inv->RemoveItem(itemComp.currencyLOT, altCurrencyCost, eInventoryType::ALL)) {
 			GameMessages::SendVendorTransactionResult(entity, sysAddr, eVendorTransactionResult::PURCHASE_FAIL);
 			return;
 		}
-		inv->RemoveItem(itemComp.currencyLOT, altCurrencyCost);
 	}
 
 	//inv->RemoveItem(count, -1, iObjID);
@@ -4923,6 +4925,11 @@ void GameMessages::HandleFireEventServerSide(RakNet::BitStream& inStream, Entity
 			LOG("Transferring %s to Zone %i (Instance %i | Clone %i | Mythran Shift: %s) with IP %s and Port %i", character->GetName().c_str(), zoneID, zoneInstance, zoneClone, mythranShift == true ? "true" : "false", serverIP.c_str(), serverPort);
 
 			if (character) {
+				auto* characterComponent = player->GetComponent<CharacterComponent>();
+				if (characterComponent) {
+					characterComponent->AddVisitedLevel(LWOZONEID(zoneID, LWOINSTANCEID_INVALID, zoneClone));
+				}
+
 				character->SetZoneID(zoneID);
 				character->SetZoneInstance(zoneInstance);
 				character->SetZoneClone(zoneClone);
@@ -4954,56 +4961,8 @@ void GameMessages::HandleQuickBuildCancel(RakNet::BitStream& inStream, Entity* e
 	quickBuildComponent->CancelQuickBuild(Game::entityManager->GetEntity(userID), eQuickBuildFailReason::CANCELED_EARLY);
 }
 
-void GameMessages::HandleRequestUse(RakNet::BitStream& inStream, Entity* entity, const SystemAddress& sysAddr) {
-	bool bIsMultiInteractUse = false;
-	unsigned int multiInteractID;
-	int multiInteractType;
-	bool secondary;
-	LWOOBJID objectID;
-
-	inStream.Read(bIsMultiInteractUse);
-	inStream.Read(multiInteractID);
-	inStream.Read(multiInteractType);
-	inStream.Read(objectID);
-	inStream.Read(secondary);
-
-	Entity* interactedObject = Game::entityManager->GetEntity(objectID);
-
-	if (interactedObject == nullptr) {
-		LOG("Object %llu tried to interact, but doesn't exist!", objectID);
-
-		return;
-	}
-
-	if (interactedObject->GetLOT() == 9524) {
-		entity->GetCharacter()->SetBuildMode(true);
-	}
-
-	if (bIsMultiInteractUse) {
-		if (multiInteractType == 0) {
-			auto* missionOfferComponent = static_cast<MissionOfferComponent*>(interactedObject->GetComponent(eReplicaComponentType::MISSION_OFFER));
-
-			if (missionOfferComponent != nullptr) {
-				missionOfferComponent->OfferMissions(entity, multiInteractID);
-			}
-		} else {
-			interactedObject->OnUse(entity);
-		}
-	} else {
-		interactedObject->OnUse(entity);
-	}
-
-	//Perform use task if possible:
-	auto missionComponent = static_cast<MissionComponent*>(entity->GetComponent(eReplicaComponentType::MISSION));
-
-	if (missionComponent == nullptr) return;
-
-	missionComponent->Progress(eMissionTaskType::TALK_TO_NPC, interactedObject->GetLOT(), interactedObject->GetObjectID());
-	missionComponent->Progress(eMissionTaskType::INTERACT, interactedObject->GetLOT(), interactedObject->GetObjectID());
-}
-
 void GameMessages::HandlePlayEmote(RakNet::BitStream& inStream, Entity* entity) {
-	int emoteID;
+	int32_t emoteID;
 	LWOOBJID targetID;
 
 	inStream.Read(emoteID);
@@ -5022,7 +4981,11 @@ void GameMessages::HandlePlayEmote(RakNet::BitStream& inStream, Entity* entity) 
 		if (emote) sAnimationName = emote->animationName;
 	}
 
-	RenderComponent::PlayAnimation(entity, sAnimationName);
+	GameMessages::EmotePlayed msg;
+	msg.target = entity->GetObjectID();
+	msg.emoteID = emoteID;
+	msg.targetID = targetID;      // The emote’s target entity or 0 if none
+	msg.Send(UNASSIGNED_SYSTEM_ADDRESS);  // Broadcast to all clients
 
 	MissionComponent* missionComponent = entity->GetComponent<MissionComponent>();
 	if (!missionComponent) return;
@@ -5243,7 +5206,7 @@ void GameMessages::HandlePickupCurrency(RakNet::BitStream& inStream, Entity* ent
 	if (currency == 0) return;
 
 	auto* ch = entity->GetCharacter();
-	if (entity->CanPickupCoins(currency)) {
+	if (ch && entity->PickupCoins(currency)) {
 		ch->SetCoins(ch->GetCoins() + currency, eLootSourceType::PICKUP);
 	}
 }
@@ -5544,10 +5507,18 @@ void GameMessages::HandleModularBuildFinish(RakNet::BitStream& inStream, Entity*
 			modules += u"1:" + (modToStr);
 			if (k + 1 != count) modules += u"+";
 
+			bool hasItem = false;
 			if (temp->GetLotCount(mod) > 0) {
-				inv->RemoveItem(mod, 1, TEMP_MODELS);
+				hasItem = inv->RemoveItem(mod, 1, TEMP_MODELS);
 			} else {
-				inv->RemoveItem(mod, 1);
+				hasItem = inv->RemoveItem(mod, 1, eInventoryType::ALL);
+			}
+
+			if (!hasItem) {
+				LOG("Player (%llu) attempted to finish a modular build without having all the required parts.", character->GetObjectID());
+				GameMessages::SendFinishArrangingWithItem(character, entity->GetObjectID()); // kick them from modular build
+				GameMessages::SendModularBuildEnd(character); // i dont know if this does anything but DLUv2 did it
+				return;
 			}
 
 			// Doing this check for 1 singular mission that needs to know when you've swapped every part out during a car modular build.
@@ -6201,12 +6172,9 @@ void GameMessages::HandleRemoveDonationItem(RakNet::BitStream& inStream, Entity*
 }
 
 void GameMessages::HandleConfirmDonationOnPlayer(RakNet::BitStream& inStream, Entity* entity) {
-	auto* inventoryComponent = entity->GetComponent<InventoryComponent>();
-	if (!inventoryComponent) return;
-	auto* missionComponent = entity->GetComponent<MissionComponent>();
-	if (!missionComponent) return;
-	auto* characterComponent = entity->GetComponent<CharacterComponent>();
-	if (!characterComponent || !characterComponent->GetCurrentInteracting()) return;
+	const auto [inventoryComponent, missionComponent, characterComponent] = entity->GetComponentsMut<InventoryComponent, MissionComponent, CharacterComponent>();
+	if (!inventoryComponent || !missionComponent || !characterComponent || !characterComponent->GetCurrentInteracting()) return;
+
 	auto* donationEntity = Game::entityManager->GetEntity(characterComponent->GetCurrentInteracting());
 	if (!donationEntity) return;
 	auto* donationVendorComponent = donationEntity->GetComponent<DonationVendorComponent>();
@@ -6348,6 +6316,10 @@ void GameMessages::SendUpdateInventoryUi(LWOOBJID objectId, const SystemAddress&
 }
 
 namespace GameMessages {
+	bool GameMsg::Send() {
+		return Game::entityManager->SendMessage(*this);
+	}
+
 	void GameMsg::Send(const SystemAddress& sysAddr) const {
 		CBITSTREAM;
 		CMSGHEADER;
@@ -6430,5 +6402,88 @@ namespace GameMessages {
 
 	void ShootingGalleryFire::Handle(Entity& entity, const SystemAddress& sysAddr) {
 		entity.OnShootingGalleryFire(*this);
+	}
+
+	bool RequestServerObjectInfo::Deserialize(RakNet::BitStream& bitStream) {
+		if (!bitStream.Read(bVerbose)) return false;
+		if (!bitStream.Read(clientId)) return false;
+		if (!bitStream.Read(targetForReport)) return false;
+		return true;
+	}
+
+	void RequestServerObjectInfo::Handle(Entity& entity, const SystemAddress& sysAddr) {
+		auto* handlingEntity = Game::entityManager->GetEntity(targetForReport);
+		if (handlingEntity) handlingEntity->HandleMsg(*this);
+	}
+
+	bool RequestUse::Deserialize(RakNet::BitStream& stream) {
+		if (!stream.Read(bIsMultiInteractUse)) return false;
+		if (!stream.Read(multiInteractID)) return false;
+		if (!stream.Read(multiInteractType)) return false;
+		if (!stream.Read(object)) return false;
+		if (!stream.Read(secondary)) return false;
+		return true;
+	}
+
+	void RequestUse::Handle(Entity& entity, const SystemAddress& sysAddr) {
+		Entity* interactedObject = Game::entityManager->GetEntity(object);
+
+		if (interactedObject == nullptr) {
+			LOG("Object %llu tried to interact, but doesn't exist!", object);
+
+			return;
+		}
+
+		if (interactedObject->GetLOT() == 9524) {
+			entity.GetCharacter()->SetBuildMode(true);
+		}
+
+		if (bIsMultiInteractUse) {
+			if (multiInteractType == 0) {
+				auto* missionOfferComponent = static_cast<MissionOfferComponent*>(interactedObject->GetComponent(eReplicaComponentType::MISSION_OFFER));
+
+				if (missionOfferComponent != nullptr) {
+					missionOfferComponent->OfferMissions(&entity, multiInteractID);
+				}
+			} else {
+				interactedObject->OnUse(&entity);
+			}
+		} else {
+			interactedObject->OnUse(&entity);
+		}
+
+		interactedObject->HandleMsg(*this);
+
+		//Perform use task if possible:
+		auto missionComponent = entity.GetComponent<MissionComponent>();
+
+		if (!missionComponent) return;
+
+		missionComponent->Progress(eMissionTaskType::TALK_TO_NPC, interactedObject->GetLOT(), interactedObject->GetObjectID());
+		missionComponent->Progress(eMissionTaskType::INTERACT, interactedObject->GetLOT(), interactedObject->GetObjectID());
+	}
+
+	void Smash::Serialize(RakNet::BitStream& stream) const {
+		stream.Write(bIgnoreObjectVisibility);
+		stream.Write(force);
+		stream.Write(ghostCapacity);
+		stream.Write(killerID);
+	}
+
+	void UnSmash::Serialize(RakNet::BitStream& stream) const {
+		stream.Write(builderID != LWOOBJID_EMPTY);
+		if (builderID != LWOOBJID_EMPTY) stream.Write(builderID);
+		stream.Write(duration != 3.0f);
+		if (builderID != 3.0f) stream.Write(duration);
+	}
+
+	void PlayBehaviorSound::Serialize(RakNet::BitStream& stream) const {
+		stream.Write(soundID != -1);
+		if (soundID != -1) stream.Write(soundID);
+	}
+
+	void EmotePlayed::Serialize(RakNet::BitStream& stream) const {
+		stream.Write(emoteID);
+		stream.Write(targetID);
 	}
 }

@@ -12,11 +12,12 @@
 #include "eLootSourceType.h"
 #include "Brick.h"
 #include "MessageType/Game.h"
+#include "eGameMasterLevel.h"
 
 class AMFBaseValue;
+class AMFArrayValue;
 class Entity;
 class Item;
-class NiQuaternion;
 class User;
 class Leaderboard;
 class PropertySelectQueryProperty;
@@ -50,14 +51,22 @@ enum class eCameraTargetCyclingMode : int32_t {
 
 namespace GameMessages {
 	struct GameMsg {
-		GameMsg(MessageType::Game gmId) : msgId{ gmId } {}
+		GameMsg(MessageType::Game gmId, eGameMasterLevel lvl) : msgId{ gmId }, requiredGmLevel{ lvl } {}
+		GameMsg(MessageType::Game gmId) : GameMsg(gmId, eGameMasterLevel::CIVILIAN) {}
 		virtual ~GameMsg() = default;
+
+		// Sends a message to the entity manager to route to the target
+		bool Send();
+
+		// Sends the message to the specified client or
+		// all clients if UNASSIGNED_SYSTEM_ADDRESS is specified
 		void Send(const SystemAddress& sysAddr) const;
 		virtual void Serialize(RakNet::BitStream& bitStream) const {}
 		virtual bool Deserialize(RakNet::BitStream& bitStream) { return true; }
 		virtual void Handle(Entity& entity, const SystemAddress& sysAddr) {};
 		MessageType::Game msgId;
 		LWOOBJID target{ LWOOBJID_EMPTY };
+		eGameMasterLevel requiredGmLevel;
 	};
 
 	class PropertyDataMessage;
@@ -628,7 +637,6 @@ namespace GameMessages {
 	void HandleFireEventServerSide(RakNet::BitStream& inStream, Entity* entity, const SystemAddress& sysAddr);
 	void HandleRequestPlatformResync(RakNet::BitStream& inStream, Entity* entity, const SystemAddress& sysAddr);
 	void HandleQuickBuildCancel(RakNet::BitStream& inStream, Entity* entity);
-	void HandleRequestUse(RakNet::BitStream& inStream, Entity* entity, const SystemAddress& sysAddr);
 	void HandlePlayEmote(RakNet::BitStream& inStream, Entity* entity);
 	void HandleModularBuildConvertModel(RakNet::BitStream& inStream, Entity* entity, const SystemAddress& sysAddr);
 	void HandleSetFlag(RakNet::BitStream& inStream, Entity* entity);
@@ -756,7 +764,7 @@ namespace GameMessages {
 		void Handle(Entity& entity, const SystemAddress& sysAddr) override;
 
 		NiPoint3 target{};
-		NiQuaternion rotation{};
+		NiQuaternion rotation = QuatUtils::IDENTITY;
 	};
 
 	struct ChildLoaded : public GameMsg {
@@ -769,6 +777,98 @@ namespace GameMessages {
 	struct PlayerResurrectionFinished : public GameMsg {
 		PlayerResurrectionFinished() : GameMsg(MessageType::Game::PLAYER_RESURRECTION_FINISHED) {}
 	};
-};
 
+	struct RequestServerObjectInfo : public GameMsg {
+		bool bVerbose{};
+		LWOOBJID clientId{};
+		LWOOBJID targetForReport{};
+
+		RequestServerObjectInfo() : GameMsg(MessageType::Game::REQUEST_SERVER_OBJECT_INFO, eGameMasterLevel::DEVELOPER) {}
+		bool Deserialize(RakNet::BitStream& bitStream) override;
+		void Handle(Entity& entity, const SystemAddress& sysAddr) override;
+	};
+
+	struct GetObjectReportInfo : public GameMsg {
+		AMFArrayValue* info{};
+		AMFArrayValue* subCategory{};
+		bool bVerbose{};
+
+		GetObjectReportInfo() : GameMsg(MessageType::Game::GET_OBJECT_REPORT_INFO, eGameMasterLevel::DEVELOPER) {}
+	};
+
+	struct RequestUse : public GameMsg {
+		RequestUse() : GameMsg(MessageType::Game::REQUEST_USE) {}
+
+		bool Deserialize(RakNet::BitStream& stream) override;
+		void Handle(Entity& entity, const SystemAddress& sysAddr) override;
+
+		LWOOBJID object{};
+
+		bool secondary{ false };
+
+		// Set to true if this coming from a multi-interaction UI on the client.
+		bool bIsMultiInteractUse{};
+
+		// Used only for multi-interaction
+		unsigned int multiInteractID{};
+
+		// Used only for multi-interaction, is of the enum type InteractionType
+		int multiInteractType{};
+	};
+
+	struct Smash : public GameMsg {
+		Smash() : GameMsg(MessageType::Game::SMASH) {}
+
+		void Serialize(RakNet::BitStream& stream) const;
+
+		bool bIgnoreObjectVisibility{};
+		bool force{};
+		float ghostCapacity{};
+		LWOOBJID killerID{};
+	};
+
+	struct UnSmash : public GameMsg {
+		UnSmash() : GameMsg(MessageType::Game::UN_SMASH) {}
+
+		void Serialize(RakNet::BitStream& stream) const;
+
+		LWOOBJID builderID{ LWOOBJID_EMPTY };
+		float duration{ 3.0f };
+	};
+
+	struct PlayBehaviorSound : public GameMsg {
+		PlayBehaviorSound() : GameMsg(MessageType::Game::PLAY_BEHAVIOR_SOUND) {}
+
+		void Serialize(RakNet::BitStream& stream) const;
+
+		int32_t soundID{ -1 };
+	};
+
+	struct ResetModelToDefaults : public GameMsg {
+		ResetModelToDefaults() : GameMsg(MessageType::Game::RESET_MODEL_TO_DEFAULTS) {}
+	};
+
+	struct EmotePlayed : public GameMsg {
+		EmotePlayed() : GameMsg(MessageType::Game::EMOTE_PLAYED), emoteID(0), targetID(0) {}
+	
+		void Serialize(RakNet::BitStream& stream) const override;
+	
+		int32_t emoteID;
+		LWOOBJID targetID;
+	};
+
+	struct GetPosition : public GameMsg {
+		GetPosition() : GameMsg(MessageType::Game::GET_POSITION) {}
+
+		NiPoint3 pos{};
+	};
+
+	struct SetFaction : public GameMsg {
+		SetFaction() : GameMsg(MessageType::Game::SET_FACTION) {}
+
+		int32_t factionID{};
+
+		bool bIgnoreChecks{ false };
+	};
+};
 #endif // GAMEMESSAGES_H

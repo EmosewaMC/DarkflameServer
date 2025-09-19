@@ -3,6 +3,7 @@
 // C++
 #include <charconv>
 #include <cstdint>
+#include <cmath> 
 #include <ctime>
 #include <functional>
 #include <optional>
@@ -18,6 +19,8 @@
 #include "dPlatforms.h"
 #include "Game.h"
 #include "Logger.h"
+
+#include <glm/ext/vector_float3.hpp>
 
 enum eInventoryType : uint32_t;
 enum class eObjectBits : size_t;
@@ -145,7 +148,7 @@ namespace GeneralUtils {
 	template <typename... Bases>
 	struct overload : Bases... {
 		using is_transparent = void;
-		using Bases::operator() ... ;
+		using Bases::operator() ...;
 	};
 
 	struct char_pointer_hash {
@@ -202,7 +205,7 @@ namespace GeneralUtils {
 	}
 
 	template<typename T>
-	requires(!Numeric<T>)
+		requires(!Numeric<T>)
 	[[nodiscard]] std::optional<T> TryParse(std::string_view str);
 
 #if !(__GNUC__ >= 11 || _MSC_VER >= 1924)
@@ -221,7 +224,7 @@ namespace GeneralUtils {
 	*/
 	template <std::floating_point T>
 	[[nodiscard]] std::optional<T> TryParse(std::string_view str) noexcept
-	try {
+		try {
 		while (!str.empty() && std::isspace(str.front())) str.remove_prefix(1);
 
 		size_t parseNum;
@@ -243,7 +246,7 @@ namespace GeneralUtils {
 	 * @returns An std::optional containing the desired NiPoint3 if it can be constructed from the string parameters
 	*/
 	template <typename T>
-	[[nodiscard]] std::optional<NiPoint3> TryParse(const std::string_view strX, const std::string_view strY, const std::string_view strZ) {
+	[[nodiscard]] std::optional<T> TryParse(const std::string_view strX, const std::string_view strY, const std::string_view strZ) {
 		const auto x = TryParse<float>(strX);
 		if (!x) return std::nullopt;
 
@@ -251,7 +254,7 @@ namespace GeneralUtils {
 		if (!y) return std::nullopt;
 
 		const auto z = TryParse<float>(strZ);
-		return z ? std::make_optional<NiPoint3>(x.value(), y.value(), z.value()) : std::nullopt;
+		return z ? std::make_optional<T>(x.value(), y.value(), z.value()) : std::nullopt;
 	}
 
 	/**
@@ -260,8 +263,8 @@ namespace GeneralUtils {
 	 * @returns An std::optional containing the desired NiPoint3 if it can be constructed from the string parameters
 	*/
 	template <typename T>
-	[[nodiscard]] std::optional<NiPoint3> TryParse(const std::span<const std::string> str) {
-		return (str.size() == 3) ? TryParse<NiPoint3>(str[0], str[1], str[2]) : std::nullopt;
+	[[nodiscard]] std::optional<T> TryParse(const std::span<const std::string> str) {
+		return (str.size() == 3) ? TryParse<T>(str[0], str[1], str[2]) : std::nullopt;
 	}
 
 	template <typename T>
@@ -299,6 +302,12 @@ namespace GeneralUtils {
 		return T();
 	}
 
+	template<typename Container>
+	inline Container::value_type GetRandomElement(const Container& container) {
+		DluAssert(!container.empty());
+		return container[GenerateRandomNumber<typename Container::value_type>(0, container.size() - 1)];
+	}
+
 	/**
 	 * Casts the value of an enum entry to its underlying type
 	 * @param entry Enum entry to cast
@@ -322,5 +331,29 @@ namespace GeneralUtils {
 		static_assert(std::is_arithmetic<T>::value, "Not an arithmetic type");
 
 		return GenerateRandomNumber<T>(std::numeric_limits<T>::min(), std::numeric_limits<T>::max());
+	}
+
+	// https://www.quora.com/How-do-you-round-to-specific-increments-like-0-5-in-C
+	// Rounds to the nearest floating point value specified.
+	template <typename T, std::enable_if_t<std::is_floating_point_v<T>, int> = 0>
+	T RountToNearestEven(const T value, const T modulus) {
+		const auto modulo = std::fmod(value, modulus);
+		const auto abs_modulo_2 = std::abs(modulo * 2);
+		const auto abs_modulus = std::abs(modulus);
+
+		bool round_away_from_zero = false;
+		if (abs_modulo_2 > abs_modulus) {
+			round_away_from_zero = true;
+		} else if (abs_modulo_2 == abs_modulus) {
+			const auto trunc_quot = std::floor(std::abs(value / modulus));
+			const auto odd = std::fmod(trunc_quot, T{ 2 }) != 0;
+			round_away_from_zero = odd;
+		}
+
+		if (round_away_from_zero) {
+			return value + (std::copysign(modulus, value) - modulo);
+		} else {
+			return value - modulo;
+		}
 	}
 }

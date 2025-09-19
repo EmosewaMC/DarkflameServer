@@ -123,7 +123,7 @@ void RacingControlComponent::LoadPlayerVehicle(Entity* player,
 
 	auto spawnPointEntities = Game::entityManager->GetEntitiesByLOT(4843);
 	auto startPosition = NiPoint3Constant::ZERO;
-	auto startRotation = NiQuaternionConstant::IDENTITY;
+	auto startRotation = QuatUtils::IDENTITY;
 	const std::string placementAsString = std::to_string(positionNumber);
 	for (auto entity : spawnPointEntities) {
 		if (!entity) continue;
@@ -393,7 +393,7 @@ void RacingControlComponent::HandleMessageBoxResponse(Entity* player, int32_t bu
 		}
 
 		const auto score = playersRating * 10 + data->finished;
-		Loot::GiveActivityLoot(player, m_Parent, m_ActivityID, score);
+		Loot::GiveActivityLoot(player, m_Parent->GetObjectID(), m_ActivityID, score);
 
 		// Giving rewards
 		GameMessages::SendNotifyRacingClient(

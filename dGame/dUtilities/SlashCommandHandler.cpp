@@ -153,7 +153,7 @@ void SlashCommandHandler::SendAnnouncement(const std::string& title, const std::
 
 	//Notify chat about it
 	CBITSTREAM;
-	BitStreamUtils::WriteHeader(bitStream, eConnectionType::CHAT, MessageType::Chat::GM_ANNOUNCE);
+	BitStreamUtils::WriteHeader(bitStream, ServiceType::CHAT, MessageType::Chat::GM_ANNOUNCE);
 
 	bitStream.Write<uint32_t>(title.size());
 	for (auto character : title) {
@@ -777,7 +777,7 @@ void SlashCommandHandler::Startup() {
 		.info = "Crashes the server",
 		.aliases = { "crash", "pumpkin" },
 		.handle = DEVGMCommands::Crash,
-		.requiredLevel = eGameMasterLevel::DEVELOPER
+		.requiredLevel = eGameMasterLevel::OPERATOR
 	};
 	RegisterCommand(CrashCommand);
 
@@ -807,6 +807,15 @@ void SlashCommandHandler::Startup() {
 		.requiredLevel = eGameMasterLevel::DEVELOPER
 	};
 	RegisterCommand(DeleteInvenCommand);
+
+	Command ExecuteCommand{
+		.help = "Execute commands with modified context (Minecraft-style)",
+		.info = "Execute commands as different entities or from different positions. Usage: /execute <subcommand> ... run <command>. Subcommands: as <entity>, at <entity>, positioned <x> <y> <z>",
+		.aliases = { "execute", "exec" },
+		.handle = DEVGMCommands::Execute,
+		.requiredLevel = eGameMasterLevel::DEVELOPER
+	};
+	RegisterCommand(ExecuteCommand);
 
 	// Register Greater Than Zero Commands
 
@@ -996,7 +1005,7 @@ void SlashCommandHandler::Startup() {
 	Command RequestMailCountCommand{
 		.help = "Gets the players mail count",
 		.info = "Sends notification with number of unread messages in the player's mailbox",
-		.aliases = { "requestmailcount" },
+		.aliases = { "requestmailcount", "checkmail" },
 		.handle = GMZeroCommands::RequestMailCount,
 		.requiredLevel = eGameMasterLevel::CIVILIAN
 	};
@@ -1444,4 +1453,29 @@ void SlashCommandHandler::Startup() {
 		.requiredLevel = eGameMasterLevel::CIVILIAN
 	};
 	RegisterCommand(removeIgnoreCommand);
+
+	Command command{
+		.help = "Shuts this world down",
+		.info = "Shuts this world down",
+		.aliases = {"shutdown"},
+		.handle = DEVGMCommands::Shutdown,
+		.requiredLevel = eGameMasterLevel::DEVELOPER
+	};
+	RegisterCommand(command);
+
+	RegisterCommand({
+		.help = "Turns all players' pvp mode on",
+		.info = "Turns all players' pvp mode on",
+		.aliases = {"barfight"},
+		.handle = DEVGMCommands::Barfight,
+		.requiredLevel = eGameMasterLevel::DEVELOPER
+	});
+
+	RegisterCommand({
+		.help = "Despawns an object by id",
+		.info = "Despawns an object by id",
+		.aliases = {"despawn"},
+		.handle = DEVGMCommands::Despawn,
+		.requiredLevel = eGameMasterLevel::DEVELOPER
+	});
 }

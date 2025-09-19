@@ -21,6 +21,8 @@
 #include "eUseItemResponse.h"
 #include "dZoneManager.h"
 #include "ChatPackets.h"
+#include "MissionComponent.h"
+#include "eMissionTaskType.h"
 
 #include "CDBrickIDTableTable.h"
 #include "CDObjectSkillsTable.h"
@@ -268,9 +270,9 @@ bool Item::IsEquipped() const {
 }
 
 bool Item::Consume() {
-	auto* skillsTable = CDClientManager::GetTable<CDObjectSkillsTable>();
+	auto* const skillsTable = CDClientManager::GetTable<CDObjectSkillsTable>();
 
-	auto skills = skillsTable->Query([this](const CDObjectSkills entry) {
+	const auto skills = skillsTable->Query([this](const CDObjectSkills& entry) {
 		return entry.objectTemplate == static_cast<uint32_t>(lot);
 		});
 
@@ -287,8 +289,12 @@ bool Item::Consume() {
 
 	GameMessages::SendUseItemResult(inventory->GetComponent()->GetParent(), lot, success);
 
-	if (success) {
-		inventory->GetComponent()->RemoveItem(lot, 1);
+	const auto myLot = this->lot;
+	if (success && inventory->GetComponent()->RemoveItem(lot, 1, eInventoryType::ALL)) {
+		// Save this because if this is the last item in the inventory
+		// we may delete ourself (lol)
+		auto* missionComponent = inventory->GetComponent()->GetParent()->GetComponent<MissionComponent>();
+		if (missionComponent) missionComponent->Progress(eMissionTaskType::GATHER, myLot, LWOOBJID_EMPTY, "", -1);
 	}
 
 	return success;

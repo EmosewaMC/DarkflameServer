@@ -101,7 +101,7 @@ void VendorComponent::SetupConstants() {
 	std::vector<CDVendorComponent> vendorComps = vendorComponentTable->Query([=](CDVendorComponent entry) { return (entry.id == componentID); });
 	if (vendorComps.empty()) return;
 	auto vendorData = vendorComps.at(0);
-	if (vendorData.buyScalar == 0.0) m_BuyScalar = Game::zoneManager->GetWorldConfig()->vendorBuyMultiplier;
+	if (vendorData.buyScalar == 0.0) m_BuyScalar = Game::zoneManager->GetWorldConfig().vendorBuyMultiplier;
 	else m_BuyScalar = vendorData.buyScalar;
 	m_SellScalar = vendorData.sellScalar;
 	m_RefreshTimeSeconds = vendorData.refreshTimeSeconds;
@@ -164,10 +164,17 @@ void VendorComponent::Buy(Entity* buyer, LOT lot, uint32_t count) {
 			return;
 		}
 	}
+
+	bool success = true;
 	for (const auto& [crafintCurrencyLOT, crafintCurrencyCount]: craftingCurrencies) {
-		inventoryComponent->RemoveItem(crafintCurrencyLOT, crafintCurrencyCount * count);
+		success = inventoryComponent->RemoveItem(crafintCurrencyLOT, crafintCurrencyCount * count, eInventoryType::ALL);
+		if (!success) break;
 	}
 
+	if (!success) {
+		GameMessages::SendVendorTransactionResult(buyer, buyer->GetSystemAddress(), eVendorTransactionResult::PURCHASE_FAIL);
+		return;
+	}
 
 	float buyScalar = GetBuyScalar();
 	const auto coinCost = static_cast<uint32_t>(std::floor((itemComp.baseValue * buyScalar) * count));
@@ -184,7 +191,7 @@ void VendorComponent::Buy(Entity* buyer, LOT lot, uint32_t count) {
 			GameMessages::SendVendorTransactionResult(buyer, buyer->GetSystemAddress(), eVendorTransactionResult::PURCHASE_FAIL);
 			return;
 		}
-		inventoryComponent->RemoveItem(itemComp.currencyLOT, altCurrencyCost);
+		inventoryComponent->RemoveItem(itemComp.currencyLOT, altCurrencyCost, eInventoryType::ALL);
 	}
 
 	character->SetCoins(character->GetCoins() - (coinCost), eLootSourceType::VENDOR);

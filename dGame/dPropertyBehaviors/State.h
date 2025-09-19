@@ -8,6 +8,7 @@ namespace tinyxml2 {
 }
 
 class AMFArrayValue;
+class ModelComponent;
 
 class State {
 public:
@@ -19,7 +20,14 @@ public:
 
 	void Serialize(tinyxml2::XMLElement& state) const;
 	void Deserialize(const tinyxml2::XMLElement& state);
+
+	void Update(float deltaTime, ModelComponent& modelComponent);
+
+	void OnChatMessageReceived(const std::string& sMessage);
+	void OnHit();
 private:
+
+	// The strips contained within this state.
 	std::vector<Strip> m_Strips;
 };
 

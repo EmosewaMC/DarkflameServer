@@ -27,6 +27,8 @@
 #include "Character.h"
 
 #include "CDMissionEmailTable.h"
+#include "ChatPackets.h"
+#include "PlayerManager.h"
 
 Mission::Mission(MissionComponent* missionComponent, const uint32_t missionId) {
 	m_MissionComponent = missionComponent;
@@ -65,7 +67,7 @@ Mission::Mission(MissionComponent* missionComponent, const uint32_t missionId) {
 	}
 }
 
-void Mission::LoadFromXml(const tinyxml2::XMLElement& element) {
+void Mission::LoadFromXmlDone(const tinyxml2::XMLElement& element) {
 	// Start custom XML
 	if (element.Attribute("state") != nullptr) {
 		m_State = static_cast<eMissionState>(std::stoul(element.Attribute("state")));
@@ -76,11 +78,15 @@ void Mission::LoadFromXml(const tinyxml2::XMLElement& element) {
 		m_Completions = std::stoul(element.Attribute("cct"));
 
 		m_Timestamp = std::stoul(element.Attribute("cts"));
-
-		if (IsComplete()) {
-			return;
-		}
 	}
+}
+
+void Mission::LoadFromXmlCur(const tinyxml2::XMLElement& element) {
+	// Start custom XML
+	if (element.Attribute("state") != nullptr) {
+		m_State = static_cast<eMissionState>(std::stoul(element.Attribute("state")));
+	}
+	// End custom XML
 
 	auto* task = element.FirstChildElement();
 
@@ -90,20 +96,18 @@ void Mission::LoadFromXml(const tinyxml2::XMLElement& element) {
 		if (index >= m_Tasks.size()) {
 			break;
 		}
+		auto* const curTask = m_Tasks[index];
 
-		const auto type = m_Tasks[index]->GetType();
+		const auto type = curTask->GetType();
 
-		if (type == eMissionTaskType::COLLECTION ||
-			type == eMissionTaskType::VISIT_PROPERTY) {
+		auto value = std::stoul(task->Attribute("v"));
+		curTask->SetProgress(value, false);
+		task = task->NextSiblingElement();
+
+		// Collection tasks and visit property tasks store each of the collected/visited targets after the progress value
+		if (type == eMissionTaskType::COLLECTION || type == eMissionTaskType::VISIT_PROPERTY) {
 			std::vector<uint32_t> uniques;
-
-			const auto value = std::stoul(task->Attribute("v"));
-
-			m_Tasks[index]->SetProgress(value, false);
-
-			task = task->NextSiblingElement();
-
-			while (task != nullptr) {
+			while (task != nullptr && value > 0) {
 				const auto unique = std::stoul(task->Attribute("v"));
 
 				uniques.push_back(unique);
@@ -113,26 +117,17 @@ void Mission::LoadFromXml(const tinyxml2::XMLElement& element) {
 				}
 
 				task = task->NextSiblingElement();
+				value--;
 			}
 
-			m_Tasks[index]->SetUnique(uniques);
-
-			m_Tasks[index]->SetProgress(uniques.size(), false);
-
-			break;
-		} else {
-			const auto value = std::stoul(task->Attribute("v"));
-
-			m_Tasks[index]->SetProgress(value, false);
-
-			task = task->NextSiblingElement();
+			curTask->SetUnique(uniques);
 		}
 
 		index++;
 	}
 }
 
-void Mission::UpdateXml(tinyxml2::XMLElement& element) {
+void Mission::UpdateXmlDone(tinyxml2::XMLElement& element) {
 	// Start custom XML
 	element.SetAttribute("state", static_cast<unsigned int>(m_State));
 	// End custom XML
@@ -141,41 +136,35 @@ void Mission::UpdateXml(tinyxml2::XMLElement& element) {
 
 	element.SetAttribute("id", static_cast<unsigned int>(info.id));
 
-	if (m_Completions > 0) {
-		element.SetAttribute("cct", static_cast<unsigned int>(m_Completions));
+	element.SetAttribute("cct", static_cast<unsigned int>(m_Completions));
 
-		element.SetAttribute("cts", static_cast<unsigned int>(m_Timestamp));
+	element.SetAttribute("cts", static_cast<unsigned int>(m_Timestamp));
+}
 
-		if (IsComplete()) {
-			return;
-		}
-	}
+void Mission::UpdateXmlCur(tinyxml2::XMLElement& element) {
+	// Start custom XML
+	element.SetAttribute("state", static_cast<unsigned int>(m_State));
+	// End custom XML
 
-	for (auto* task : m_Tasks) {
-		if (task->GetType() == eMissionTaskType::COLLECTION ||
-			task->GetType() == eMissionTaskType::VISIT_PROPERTY) {
+	element.DeleteChildren();
 
-			auto* child = element.GetDocument()->NewElement("sv");
+	element.SetAttribute("id", static_cast<unsigned int>(info.id));
 
-			child->SetAttribute("v", static_cast<unsigned int>(task->GetProgress()));
+	if (IsComplete()) return;
 
-			element.LinkEndChild(child);
-
-			for (auto unique : task->GetUnique()) {
-				auto* uniqueElement = element.GetDocument()->NewElement("sv");
-
-				uniqueElement->SetAttribute("v", static_cast<unsigned int>(unique));
-
-				element.LinkEndChild(uniqueElement);
-			}
-
-			break;
-		}
-		auto* child = element.GetDocument()->NewElement("sv");
-
+	for (const auto* const task : m_Tasks) {
+		auto* const child = element.InsertNewChildElement("sv");
 		child->SetAttribute("v", static_cast<unsigned int>(task->GetProgress()));
 
-		element.LinkEndChild(child);
+		// Collection and visit property tasks then need to store the collected/visited items after the progress
+		const auto taskType = task->GetType();
+		if (taskType == eMissionTaskType::COLLECTION || taskType == eMissionTaskType::VISIT_PROPERTY) {
+			for (const auto unique : task->GetUnique()) {
+				auto* uniqueElement = element.InsertNewChildElement("sv");
+
+				uniqueElement->SetAttribute("v", static_cast<unsigned int>(unique));
+			}
+		}
 	}
 }
 
@@ -345,12 +334,25 @@ void Mission::Complete(const bool yieldRewards) {
 	for (const auto& email : missionEmails) {
 		const auto missionEmailBase = "MissionEmail_" + std::to_string(email.ID) + "_";
 
-		if (email.messageType == 1) {
+		if (email.messageType == 1 /* Send an email to the player */) {
 			const auto subject = "%[" + missionEmailBase + "subjectText]";
 			const auto body = "%[" + missionEmailBase + "bodyText]";
 			const auto sender = "%[" + missionEmailBase + "senderName]";
 
 			Mail::SendMail(LWOOBJID_EMPTY, sender, GetAssociate(), subject, body, email.attachmentLOT, 1);
+		} else if (email.messageType == 2 /* Send an announcement in chat */) {
+			auto* character = entity->GetCharacter();
+
+			ChatPackets::AchievementNotify notify{};
+			notify.missionEmailID = email.ID;
+			notify.earningPlayerID = entity->GetObjectID();
+			notify.earnerName.string = character ? GeneralUtils::ASCIIToUTF16(character->GetName()) : u"";
+
+			// Manual write since it's sent to chat server and not a game client
+			RakNet::BitStream bitstream;
+			notify.WriteHeader(bitstream);
+			notify.Serialize(bitstream);
+			Game::chatServer->Send(&bitstream, HIGH_PRIORITY, RELIABLE, 0, Game::chatSysAddr, false);
 		}
 	}
 }
@@ -445,9 +447,9 @@ void Mission::YieldRewards() {
 	int32_t coinsToSend = 0;
 	if (info.LegoScore > 0) {
 		eLootSourceType lootSource = info.isMission ? eLootSourceType::MISSION : eLootSourceType::ACHIEVEMENT;
-		if (levelComponent->GetLevel() >= Game::zoneManager->GetWorldConfig()->levelCap) {
+		if (levelComponent->GetLevel() >= Game::zoneManager->GetWorldConfig().levelCap) {
 			// Since the character is at the level cap we reward them with coins instead of UScore.
-			coinsToSend += info.LegoScore * Game::zoneManager->GetWorldConfig()->levelCapCurrencyConversion;
+			coinsToSend += info.LegoScore * Game::zoneManager->GetWorldConfig().levelCapCurrencyConversion;
 		} else {
 			characterComponent->SetUScore(characterComponent->GetUScore() + info.LegoScore);
 			GameMessages::SendModifyLEGOScore(entity, entity->GetSystemAddress(), info.LegoScore, lootSource);
@@ -481,12 +483,7 @@ void Mission::YieldRewards() {
 
 			// If a mission rewards zero of an item, make it reward 1.
 			auto count = pair.second > 0 ? pair.second : 1;
-
-			// Sanity check, 6 is the max any mission yields
-			if (count > 6) {
-				count = 0;
-			}
-
+			LOG("Player %llu is receiving %i of item %i from repeatable mission %i", entity->GetObjectID(), count, pair.first, info.id);
 			inventoryComponent->AddItem(pair.first, count, IsMission() ? eLootSourceType::MISSION : eLootSourceType::ACHIEVEMENT);
 		}
 
@@ -514,12 +511,7 @@ void Mission::YieldRewards() {
 
 		// If a mission rewards zero of an item, make it reward 1.
 		auto count = pair.second > 0 ? pair.second : 1;
-
-		// Sanity check, 6 is the max any mission yields
-		if (count > 6) {
-			count = 0;
-		}
-
+		LOG("Player %llu is receiving %i of item %i from mission %i", entity->GetObjectID(), count, pair.first, info.id);
 		inventoryComponent->AddItem(pair.first, count, IsMission() ? eLootSourceType::MISSION : eLootSourceType::ACHIEVEMENT);
 	}
 

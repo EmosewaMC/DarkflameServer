@@ -33,6 +33,8 @@ public:
 	SimplePhysicsComponent(Entity* parent, int32_t componentID);
 	~SimplePhysicsComponent() override;
 
+	void Update(const float deltaTime) override;
+
 	void Serialize(RakNet::BitStream& outBitStream, bool bIsInitialUpdate) override;
 
 	/**
@@ -84,6 +86,8 @@ public:
 	void SetClimbableType(const eClimbableType& value) { m_ClimbableType = value; }
 
 private:
+	bool OnGetObjectReportInfo(GameMessages::GameMsg& msg);
+
 	/**
 	 * The current velocity of the entity
 	 */
