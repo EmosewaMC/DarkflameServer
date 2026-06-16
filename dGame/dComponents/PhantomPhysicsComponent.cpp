@@ -28,8 +28,8 @@
 #include "dpShapeBox.h"
 #include "dpShapeSphere.h"
 
-PhantomPhysicsComponent::PhantomPhysicsComponent(Entity* parent, int32_t componentId) : PhysicsComponent(parent, componentId) {
-	RegisterMsg(MessageType::Game::GET_OBJECT_REPORT_INFO, this, &PhantomPhysicsComponent::OnGetObjectReportInfo);
+PhantomPhysicsComponent::PhantomPhysicsComponent(Entity* parent, const int32_t componentID) : PhysicsComponent(parent, componentID) {
+	RegisterMsg(&PhantomPhysicsComponent::OnGetObjectReportInfo);
 
 	m_Position = m_Parent->GetDefaultPosition();
 	m_Rotation = m_Parent->GetDefaultRotation();
@@ -58,31 +58,16 @@ PhantomPhysicsComponent::PhantomPhysicsComponent(Entity* parent, int32_t compone
 	}
 
 	if (m_IsRespawnVolume) {
-		{
-			auto respawnString = std::stringstream(m_Parent->GetVarAsString(u"rspPos"));
+		const auto respawnPos = GeneralUtils::SplitString(m_Parent->GetVarAsString(u"rspPos"), '\x1f');
+		m_RespawnPos = GeneralUtils::TryParse(respawnPos, NiPoint3Constant::ZERO);
 
-			std::string segment;
-			std::vector<std::string> seglist;
-
-			while (std::getline(respawnString, segment, '\x1f')) {
-				seglist.push_back(segment);
-			}
-
-			m_RespawnPos = NiPoint3(std::stof(seglist[0]), std::stof(seglist[1]), std::stof(seglist[2]));
-		}
-
-		{
-			auto respawnString = std::stringstream(m_Parent->GetVarAsString(u"rspRot"));
-
-			std::string segment;
-			std::vector<std::string> seglist;
-
-			while (std::getline(respawnString, segment, '\x1f')) {
-				seglist.push_back(segment);
-			}
-
-			m_RespawnRot = NiQuaternion(std::stof(seglist[0]), std::stof(seglist[1]), std::stof(seglist[2]), std::stof(seglist[3]));
-		}
+		const auto respawnRot = GeneralUtils::SplitString(m_Parent->GetVarAsString(u"rspRot"), '\x1f');
+		m_RespawnRot = respawnRot.size() >= 4 ? NiQuaternion(
+			GeneralUtils::TryParse(respawnRot[0], 1.0f),
+			GeneralUtils::TryParse(respawnRot[1], 0.0f),
+			GeneralUtils::TryParse(respawnRot[2], 0.0f),
+			GeneralUtils::TryParse(respawnRot[3], 0.0f))
+			: QuatUtils::IDENTITY;
 	}
 
 	// HF - RespawnPoints. Legacy respawn entity.
@@ -242,9 +227,8 @@ void PhantomPhysicsComponent::SetRotation(const NiQuaternion& rot) {
 	if (m_dpEntity) m_dpEntity->SetRotation(rot);
 }
 
-bool PhantomPhysicsComponent::OnGetObjectReportInfo(GameMessages::GameMsg& msg) {
-	PhysicsComponent::OnGetObjectReportInfo(msg);
-	auto& reportInfo = static_cast<GameMessages::GetObjectReportInfo&>(msg);
+bool PhantomPhysicsComponent::OnGetObjectReportInfo(GameMessages::GetObjectReportInfo& reportInfo) {
+	PhysicsComponent::OnGetObjectReportInfo(reportInfo);
 	if (!reportInfo.subCategory) {
 		return false;
 	}

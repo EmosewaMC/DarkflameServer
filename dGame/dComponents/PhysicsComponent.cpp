@@ -15,7 +15,7 @@
 #include "EntityInfo.h"
 #include "Amf3.h"
 
-PhysicsComponent::PhysicsComponent(Entity* parent, int32_t componentId) : Component(parent) {
+PhysicsComponent::PhysicsComponent(Entity* parent, const int32_t componentID) : Component(parent, componentID) {
 	m_Position = NiPoint3Constant::ZERO;
 	m_Rotation = QuatUtils::IDENTITY;
 	m_DirtyPosition = false;
@@ -23,7 +23,7 @@ PhysicsComponent::PhysicsComponent(Entity* parent, int32_t componentId) : Compon
 	CDPhysicsComponentTable* physicsComponentTable = CDClientManager::GetTable<CDPhysicsComponentTable>();
 
 	if (physicsComponentTable) {
-		auto* info = physicsComponentTable->GetByID(componentId);
+		auto* info = physicsComponentTable->GetByID(componentID);
 		if (info) {
 			m_CollisionGroup = info->collisionGroup;
 		}
@@ -31,11 +31,11 @@ PhysicsComponent::PhysicsComponent(Entity* parent, int32_t componentId) : Compon
 
 	if (m_Parent->HasVar(u"CollisionGroupID")) m_CollisionGroup = m_Parent->GetVar<int32_t>(u"CollisionGroupID");
 
-	RegisterMsg(MessageType::Game::GET_POSITION, this, &PhysicsComponent::OnGetPosition);
+	RegisterMsg(&PhysicsComponent::OnGetPosition);
 }
 
-bool PhysicsComponent::OnGetPosition(GameMessages::GameMsg& msg) {
-	static_cast<GameMessages::GetPosition&>(msg).pos = GetPosition();
+bool PhysicsComponent::OnGetPosition(GameMessages::GetPosition& msg) {
+	msg.pos = GetPosition();
 	return true;
 }
 
@@ -245,8 +245,7 @@ void PhysicsComponent::SpawnVertices(dpEntity* entity) const {
 	}
 }
 
-bool PhysicsComponent::OnGetObjectReportInfo(GameMessages::GameMsg& msg) {
-	auto& reportInfo = static_cast<GameMessages::GetObjectReportInfo&>(msg);
+bool PhysicsComponent::OnGetObjectReportInfo(GameMessages::GetObjectReportInfo& reportInfo) {
 	auto& info = reportInfo.info->PushDebug("Physics");
 	reportInfo.subCategory = &info;
 

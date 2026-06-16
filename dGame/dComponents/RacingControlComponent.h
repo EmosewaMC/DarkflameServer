@@ -6,7 +6,7 @@
 
 #include "BitStream.h"
 #include "Entity.h"
-#include "Component.h"
+#include "ActivityComponent.h"
 #include "eReplicaComponentType.h"
 #include <chrono>
 
@@ -104,11 +104,11 @@ struct RacingPlayerInfo {
 /**
  * Component that's attached to a manager entity in each race zone that loads player vehicles, keep scores, etc.
  */
-class RacingControlComponent final : public Component {
+class RacingControlComponent final : public ActivityComponent {
 public:
 	static constexpr eReplicaComponentType ComponentType = eReplicaComponentType::RACING_CONTROL;
 
-	RacingControlComponent(Entity* parentEntity);
+	RacingControlComponent(Entity* parentEntity, const int32_t componentID);
 	~RacingControlComponent();
 
 	void Serialize(RakNet::BitStream& outBitStream, bool bIsInitialUpdate) override;
@@ -152,7 +152,7 @@ public:
 	 */
 	RacingPlayerInfo* GetPlayerData(LWOOBJID playerID);
 
-	void MsgConfigureRacingControl(const GameMessages::ConfigureRacingControl& msg);
+	bool MsgConfigureRacingControl(const GameMessages::ConfigureRacingControl& msg);
 
 private:
 

@@ -59,6 +59,7 @@ int main(int argc, char** argv) {
 	//Create all the objects we need to run our service:
 	Server::SetupLogger("ChatServer");
 	if (!Game::logger) return EXIT_FAILURE;
+	Game::config->LogSettings();
 
 	//Read our config:
 
@@ -201,8 +202,11 @@ int main(int argc, char** argv) {
 	//Delete our objects here:
 	Database::Destroy("ChatServer");
 	delete Game::server;
+	Game::server = nullptr;
 	delete Game::logger;
+	Game::logger = nullptr;
 	delete Game::config;
+	Game::config = nullptr;
 
 	return EXIT_SUCCESS;
 }

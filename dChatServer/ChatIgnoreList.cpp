@@ -3,6 +3,7 @@
 #include "MessageType/Chat.h"
 #include "BitStreamUtils.h"
 #include "Game.h"
+#include "dConfig.h"
 #include "Logger.h"
 #include "eObjectBits.h"
 
@@ -34,7 +35,7 @@ void ChatIgnoreList::GetIgnoreList(Packet* packet) {
 	if (!receiver.ignoredPlayers.empty()) {
 		LOG_DEBUG("Player %llu already has an ignore list, but is requesting it again.", playerId);
 	} else {
-		auto ignoreList = Database::Get()->GetIgnoreList(static_cast<uint32_t>(playerId));
+		auto ignoreList = Database::Get()->GetIgnoreList(playerId);
 		if (ignoreList.empty()) {
 			LOG_DEBUG("Player %llu has no ignores", playerId);
 			return;
@@ -43,7 +44,6 @@ void ChatIgnoreList::GetIgnoreList(Packet* packet) {
 		for (auto& ignoredPlayer : ignoreList) {
 			receiver.ignoredPlayers.emplace_back(ignoredPlayer.name, ignoredPlayer.id);
 			GeneralUtils::SetBit(receiver.ignoredPlayers.back().playerId, eObjectBits::CHARACTER);
-			GeneralUtils::SetBit(receiver.ignoredPlayers.back().playerId, eObjectBits::PERSISTENT);
 		}
 	}
 
@@ -73,8 +73,8 @@ void ChatIgnoreList::AddIgnore(Packet* packet) {
 		return;
 	}
 
-	constexpr int32_t MAX_IGNORES = 32;
-	if (receiver.ignoredPlayers.size() > MAX_IGNORES) {
+	const int32_t MAX_IGNORES = Game::config->GetValue("max_ignores", 32);
+	if (receiver.ignoredPlayers.size() >= MAX_IGNORES) {
 		LOG_DEBUG("Player %llu has too many ignores", playerId);
 		return;
 	}
@@ -114,9 +114,8 @@ void ChatIgnoreList::AddIgnore(Packet* packet) {
 		}
 
 		if (ignoredPlayerId != LWOOBJID_EMPTY) {
-			Database::Get()->AddIgnore(static_cast<uint32_t>(playerId), static_cast<uint32_t>(ignoredPlayerId));
+			Database::Get()->AddIgnore(playerId, ignoredPlayerId);
 			GeneralUtils::SetBit(ignoredPlayerId, eObjectBits::CHARACTER);
-			GeneralUtils::SetBit(ignoredPlayerId, eObjectBits::PERSISTENT);
 
 			receiver.ignoredPlayers.emplace_back(toIgnoreStr, ignoredPlayerId);
 			LOG_DEBUG("Player %llu is ignoring %s", playerId, toIgnoreStr.c_str());
@@ -157,7 +156,7 @@ void ChatIgnoreList::RemoveIgnore(Packet* packet) {
 		return;
 	}
 
-	Database::Get()->RemoveIgnore(static_cast<uint32_t>(playerId), static_cast<uint32_t>(toRemove->playerId));
+	Database::Get()->RemoveIgnore(playerId, toRemove->playerId);
 	receiver.ignoredPlayers.erase(toRemove, receiver.ignoredPlayers.end());
 
 	CBITSTREAM;

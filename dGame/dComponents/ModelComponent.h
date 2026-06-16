@@ -27,13 +27,14 @@ class ModelComponent final : public Component {
 public:
 	static constexpr eReplicaComponentType ComponentType = eReplicaComponentType::MODEL;
 
-	ModelComponent(Entity* parent);
+	ModelComponent(Entity* parent, const int32_t componentID);
 
 	void LoadBehaviors();
 	void Update(float deltaTime) override;
 
-	bool OnRequestUse(GameMessages::GameMsg& msg);
-	bool OnResetModelToDefaults(GameMessages::GameMsg& msg);
+	bool OnRequestUse(GameMessages::RequestUse& requestUse);
+	bool OnResetModelToDefaults(GameMessages::ResetModelToDefaults& resetModelToDefaults);
+	bool OnGetObjectReportInfo(GameMessages::GetObjectReportInfo& reportInfo);
 
 	void Serialize(RakNet::BitStream& outBitStream, bool bIsInitialUpdate) override;
 
@@ -96,6 +97,8 @@ public:
 		newBehavior->HandleMsg(msg);
 		return msg.GetNeedsNewBehaviorID();
 	};
+
+	void ProgressAddBehaviorMission(Entity& playerEntity);
 
 	void AddBehavior(AddMessage& msg);
 

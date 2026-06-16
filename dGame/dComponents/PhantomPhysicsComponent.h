@@ -12,7 +12,6 @@
 #include "eReplicaComponentType.h"
 #include "PhysicsComponent.h"
 
-class LDFBaseData;
 class Entity;
 class dpEntity;
 enum class ePhysicsEffectType : uint32_t ;
@@ -28,7 +27,7 @@ class PhantomPhysicsComponent final : public PhysicsComponent {
 public:
 	static constexpr eReplicaComponentType ComponentType = eReplicaComponentType::PHANTOM_PHYSICS;
 
-	PhantomPhysicsComponent(Entity* parent, int32_t componentId);
+	PhantomPhysicsComponent(Entity* parent, const int32_t componentID);
 	~PhantomPhysicsComponent() override;
 	void Update(float deltaTime) override;
 	void Serialize(RakNet::BitStream& outBitStream, bool bIsInitialUpdate) override;
@@ -116,7 +115,7 @@ public:
 	void SetMax(uint32_t max);
 
 private:
-	bool OnGetObjectReportInfo(GameMessages::GameMsg& msg);
+	bool OnGetObjectReportInfo(GameMessages::GetObjectReportInfo& reportInfo);
 
 	/**
 	 * A scale to apply to the size of the physics object

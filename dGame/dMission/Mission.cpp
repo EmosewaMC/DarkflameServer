@@ -29,6 +29,11 @@
 #include "CDMissionEmailTable.h"
 #include "ChatPackets.h"
 #include "PlayerManager.h"
+#include "StringifiedEnum.h"
+
+namespace {
+	std::set<uint32_t> g_TestedMissions = { 773, 774, 775, 776, 777 }; // TODO Figure out why these missions are broken sometimes
+}
 
 Mission::Mission(MissionComponent* missionComponent, const uint32_t missionId) {
 	m_MissionComponent = missionComponent;
@@ -69,22 +74,19 @@ Mission::Mission(MissionComponent* missionComponent, const uint32_t missionId) {
 
 void Mission::LoadFromXmlDone(const tinyxml2::XMLElement& element) {
 	// Start custom XML
-	if (element.Attribute("state") != nullptr) {
-		m_State = static_cast<eMissionState>(std::stoul(element.Attribute("state")));
-	}
+	m_State = static_cast<eMissionState>(element.UnsignedAttribute("state"));
 	// End custom XML
 
-	if (element.Attribute("cct") != nullptr) {
-		m_Completions = std::stoul(element.Attribute("cct"));
+	m_Completions = element.UnsignedAttribute("cct");
 
-		m_Timestamp = std::stoul(element.Attribute("cts"));
-	}
+	m_Timestamp = element.UnsignedAttribute("cts");
 }
 
 void Mission::LoadFromXmlCur(const tinyxml2::XMLElement& element) {
+	const auto* const character = GetCharacter();
 	// Start custom XML
 	if (element.Attribute("state") != nullptr) {
-		m_State = static_cast<eMissionState>(std::stoul(element.Attribute("state")));
+		m_State = static_cast<eMissionState>(element.IntAttribute("state", -1));
 	}
 	// End custom XML
 
@@ -100,7 +102,7 @@ void Mission::LoadFromXmlCur(const tinyxml2::XMLElement& element) {
 
 		const auto type = curTask->GetType();
 
-		auto value = std::stoul(task->Attribute("v"));
+		auto value = task->UnsignedAttribute("v");
 		curTask->SetProgress(value, false);
 		task = task->NextSiblingElement();
 
@@ -108,7 +110,7 @@ void Mission::LoadFromXmlCur(const tinyxml2::XMLElement& element) {
 		if (type == eMissionTaskType::COLLECTION || type == eMissionTaskType::VISIT_PROPERTY) {
 			std::vector<uint32_t> uniques;
 			while (task != nullptr && value > 0) {
-				const auto unique = std::stoul(task->Attribute("v"));
+				const auto unique = task->UnsignedAttribute("v");
 
 				uniques.push_back(unique);
 
@@ -121,6 +123,12 @@ void Mission::LoadFromXmlCur(const tinyxml2::XMLElement& element) {
 			}
 
 			curTask->SetUnique(uniques);
+		} else if (type == eMissionTaskType::PLAYER_FLAG) {
+			int32_t progress = 0; // Update the progress to not include session flags which are unset between logins
+			for (const auto flag : curTask->GetAllTargets()) {
+				if (character->GetPlayerFlag(flag)) progress++;
+			}
+			curTask->SetProgress(progress, false);
 		}
 
 		index++;
@@ -258,6 +266,12 @@ bool Mission::IsReadyToComplete() const {
 	return m_State == eMissionState::READY_TO_COMPLETE || m_State == eMissionState::COMPLETE_READY_TO_COMPLETE;
 }
 
+bool Mission::IsFailed() const {
+	const auto underlying = GeneralUtils::ToUnderlying(m_State);
+	const auto target = GeneralUtils::ToUnderlying(eMissionState::FAILED);
+	return (underlying & target) != 0;
+}
+
 void Mission::MakeReadyToComplete() {
 	SetMissionState(m_Completions == 0 ? eMissionState::READY_TO_COMPLETE : eMissionState::COMPLETE_READY_TO_COMPLETE);
 }
@@ -389,9 +403,7 @@ void Mission::Catchup() {
 					task->Progress(target);
 				}
 			}
-		}
-
-		if (type == eMissionTaskType::PLAYER_FLAG) {
+		} else if (type == eMissionTaskType::PLAYER_FLAG) {
 			for (int32_t target : task->GetAllTargets()) {
 				const auto flag = GetCharacter()->GetPlayerFlag(target);
 
@@ -404,6 +416,24 @@ void Mission::Catchup() {
 				if (task->IsComplete()) {
 					break;
 				}
+			}
+		} else if (type == eMissionTaskType::RACING) {
+			// check if its a racing meta task ("4") and then set its progress to the current completed missions in all tasks
+			const auto& clientInfo = task->GetClientInfo();
+			if (clientInfo.taskParam1.starts_with("4")) {
+				// Each target is racing mission that needs to be completed.
+				// If its completed, progress the meta task by 1.
+				// at the end set the task progress to avoid sending excess msgs across the wire
+				uint32_t progress = 0;
+				for (const auto& target : task->GetAllTargets()) {
+					if (target == 0) continue;
+
+					auto* racingMission = m_MissionComponent->GetMission(target);
+					if (racingMission != nullptr && racingMission->IsComplete()) {
+						progress++;
+					}
+				}
+				task->SetProgress(progress);
 			}
 		}
 	}
@@ -563,12 +593,14 @@ void Mission::YieldRewards() {
 
 void Mission::Progress(eMissionTaskType type, int32_t value, LWOOBJID associate, const std::string& targets, int32_t count) {
 	const auto isRemoval = count < 0;
-
+	const bool testedMission = GetTestedMissions().contains(GetMissionId());
+	if (testedMission) LOG("%i Removal: %s complete: %s achievement: %s", GetMissionId(), isRemoval ? "true" : "false", IsComplete() ? "true" : "false", IsAchievement() ? "true" : "false");
 	if (isRemoval && (IsComplete() || IsAchievement())) {
 		return;
 	}
 
 	for (auto* task : m_Tasks) {
+		if (testedMission) LOG("Complete: %s Type: %s TaskType: %s", task->IsComplete() ? "true" : "false", StringifiedEnum::ToString(type).data(), StringifiedEnum::ToString(task->GetType()).data());
 		if (task->IsComplete() && !isRemoval) {
 			continue;
 		}
@@ -617,4 +649,8 @@ Mission::~Mission() {
 	}
 
 	m_Tasks.clear();
+}
+
+const std::set<uint32_t>& Mission::GetTestedMissions() const {
+	return g_TestedMissions;
 }

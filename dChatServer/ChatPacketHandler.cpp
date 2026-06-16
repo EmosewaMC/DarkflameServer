@@ -35,7 +35,6 @@ void ChatPacketHandler::HandleFriendlistRequest(Packet* packet) {
 		FriendData fd;
 		fd.isFTP = false; // not a thing in DLU
 		fd.friendID = friendData.friendID;
-		GeneralUtils::SetBit(fd.friendID, eObjectBits::PERSISTENT);
 		GeneralUtils::SetBit(fd.friendID, eObjectBits::CHARACTER);
 
 		fd.isBestFriend = friendData.isBestFriend; //0 = friends, 1 = left_requested, 2 = right_requested, 3 = both_accepted - are now bffs
@@ -161,9 +160,7 @@ void ChatPacketHandler::HandleFriendRequest(Packet* packet) {
 
 			// Set the bits
 			GeneralUtils::SetBit(queryPlayerID, eObjectBits::CHARACTER);
-			GeneralUtils::SetBit(queryPlayerID, eObjectBits::PERSISTENT);
 			GeneralUtils::SetBit(queryFriendID, eObjectBits::CHARACTER);
-			GeneralUtils::SetBit(queryFriendID, eObjectBits::PERSISTENT);
 
 			// Since this player can either be the friend of someone else or be friends with someone else
 			// their column in the database determines what bit gets set.  When the value hits 3, they
@@ -318,7 +315,6 @@ void ChatPacketHandler::HandleRemoveFriend(Packet* packet) {
 	}
 
 	// Convert friendID to LWOOBJID
-	GeneralUtils::SetBit(friendID, eObjectBits::PERSISTENT);
 	GeneralUtils::SetBit(friendID, eObjectBits::CHARACTER);
 
 	Database::Get()->RemoveFriend(playerID, friendID);
@@ -439,6 +435,11 @@ void ChatPacketHandler::HandleChatMessage(Packet* packet) {
 	inStream.IgnoreBytes(4);
 	inStream.Read(channel);
 	inStream.Read(size);
+	if (size > MAX_MESSAGE_LENGTH) {
+		LOG("Received a probably spoofed chat message, ignoring msg");
+		return;
+	}
+
 	inStream.IgnoreBytes(77);
 
 	LUWString message(size);
@@ -483,6 +484,11 @@ void ChatPacketHandler::HandlePrivateChatMessage(Packet* packet) {
 	if (channel != eChatChannel::PRIVATE_CHAT) LOG("WARNING: Received Private chat with the wrong channel!");
 
 	inStream.Read(size);
+	if (size > MAX_MESSAGE_LENGTH) {
+		LOG("Received a probably spoofed chat message, ignoring msg");
+		return;
+	}
+
 	inStream.IgnoreBytes(77);
 
 	inStream.Read(LUReceiverName);
